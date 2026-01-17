@@ -4,8 +4,8 @@
 @using MudBlazor
 @inject IDocumentUploadService DocumentUploadService
 @inject ISnackbar Snackbar
-@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, ILazyLookup
-@typeparam TDto where TDto : IDto, IAuditDto, ISubject, ILazyLookup
+@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, IAutoCrud
+@typeparam TDto where TDto : IDto, IAuditDto, ISubject, IAutoCrud
 
 <div class="avatar-upload-container">
     <div class="avatar-preview">

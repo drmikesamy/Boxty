@@ -6,15 +6,24 @@
     <Nullable>enable</Nullable>
     <PackageId>Boxty.SharedBase</PackageId>
     <Version>1.0.0</Version>
-    <PackageTags>Composed Health;SharedBase</PackageTags>
-    <Description>
-      This is the base shared library by Composed Health Ltd.
-    </Description>
+    <Authors>Mike Samy</Authors>
+    <Company>Composed Health Ltd</Company>
+    <PackageTags>Composed Health;SharedBase;DTOs;Validation</PackageTags>
+    <Description>Shared models, DTOs, and interfaces for Boxty multi-tenant applications</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/drmikesamy/Boxty</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/drmikesamy/Boxty</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Heron.MudCalendar" Version="3.0.0" />
     <PackageReference Include="FluentValidation" Version="11.9.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

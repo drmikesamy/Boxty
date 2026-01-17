@@ -4,8 +4,8 @@
 @using Boxty.SharedBase.Interfaces
 @using Boxty.SharedBase.Models
 @using MudBlazor
-@typeparam T where T : class, IDto, IAuditDto, ILazyLookup
-@inject ILazyLookupService<T> LookupService
+@typeparam T where T : class, IDto, IAuditDto, IAutoCrud
+@inject ICrudService<T> LookupService
 @inject IAuthHelperService AuthHelperService
 @inject NavigationManager NavigationManager
 

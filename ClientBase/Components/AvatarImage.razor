@@ -4,9 +4,9 @@
 @using Boxty.SharedBase.DTOs
 @using Boxty.SharedBase.Interfaces
 @inject IDocumentUploadService DocumentUploadService
-@inject ILazyLookupService<TDto> LazyLookupService
-@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, ILazyLookup
-@typeparam TDto where TDto : IDto, ISubject, ILazyLookup
+@inject ICrudService<TDto> CrudService
+@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, IAutoCrud
+@typeparam TDto where TDto : IDto, ISubject, IAutoCrud
 
 @if (CurrentAvatarUrl != null)
 {
@@ -35,7 +35,7 @@ else
         }
         else if (UserId != Guid.Empty)
         {
-            var user = await LazyLookupService.GetItemById(UserId, CancellationToken.None);
+            var user = await CrudService.GetItemById(UserId, CancellationToken.None);
             if (user != null && user is ISubject subject && subject.AvatarImageGuid != Guid.Empty)
             {
                 CurrentAvatarUrl = await DocumentUploadService.GetSasLink<TDocumentDto>(subject.AvatarImageGuid, CancellationToken.None);

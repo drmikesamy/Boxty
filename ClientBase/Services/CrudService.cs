@@ -9,8 +9,8 @@ using MudBlazor;
 
 namespace Boxty.ClientBase.Services
 {
-    public interface ILazyLookupService<TDto>
-where TDto : IDto, ILazyLookup
+    public interface ICrudService<TDto>
+where TDto : IDto, IAutoCrud
     {
         string ItemToString(Guid e);
         Task<IEnumerable<Guid>> ItemSearch(string value, CancellationToken token, Guid? tenantConstraint = null, Guid? subjectConstraint = null);
@@ -26,8 +26,8 @@ where TDto : IDto, ILazyLookup
         Task<IEnumerable<TDto>> GetAllByCustom(string customRoute, CancellationToken token);
     }
 
-    public class LazyLookupService<TDto> : ILazyLookupService<TDto>
-    where TDto : IDto, ILazyLookup
+    public class CrudService<TDto> : ICrudService<TDto>
+    where TDto : IDto, IAutoCrud
     {
         private static string EndpointType => typeof(TDto).Name.Replace("Dto", string.Empty).ToLowerInvariant();
         private Dictionary<Guid, Tuple<TDto, DateTime>> _itemList { get; set; } = new();
@@ -36,7 +36,7 @@ where TDto : IDto, ILazyLookup
         private readonly ISnackbar _snackbar;
         private readonly IDialogService _dialogService;
         private readonly GlobalStateService _globalStateService;
-        public LazyLookupService(IHttpClientFactory httpClientFactory, ISnackbar snackbar, IDialogService dialogService, GlobalStateService globalStateService)
+        public CrudService(IHttpClientFactory httpClientFactory, ISnackbar snackbar, IDialogService dialogService, GlobalStateService globalStateService)
         {
             _httpClient = httpClientFactory.CreateClient("api");
             _snackbar = snackbar;

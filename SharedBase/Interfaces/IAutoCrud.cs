@@ -1,6 +1,6 @@
 ﻿namespace Boxty.SharedBase.Interfaces
 {
-    public interface ILazyLookup
+    public interface IAutoCrud
     {
         string DisplayName { get; }
     }

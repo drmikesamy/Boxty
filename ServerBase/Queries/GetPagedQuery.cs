@@ -85,11 +85,11 @@ namespace Boxty.ServerBase.Queries
                 }
             }
 
-            // Apply SearchTerm filter on the DTOs after mapping (only if TDto implements ILazyLookup)
-            if (filter != null && !string.IsNullOrWhiteSpace(filter.SearchTerm) && typeof(ILazyLookup).IsAssignableFrom(typeof(TDto)))
+            // Apply SearchTerm filter on the DTOs after mapping (only if TDto implements IAutoCrud)
+            if (filter != null && !string.IsNullOrWhiteSpace(filter.SearchTerm) && typeof(IAutoCrud).IsAssignableFrom(typeof(TDto)))
             {
                 authorizedEntities = authorizedEntities
-                    .Where(dto => (dto as ILazyLookup)?.DisplayName?.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) == true)
+                    .Where(dto => (dto as IAutoCrud)?.DisplayName?.Contains(filter.SearchTerm, StringComparison.OrdinalIgnoreCase) == true)
                     .ToList();
             }
 

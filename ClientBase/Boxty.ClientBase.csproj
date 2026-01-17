@@ -6,10 +6,15 @@
     <Nullable>enable</Nullable>
     <PackageId>Boxty.ClientBase</PackageId>
     <Version>1.0.0</Version>
-    <PackageTags>Composed Health;ClientBase</PackageTags>
-    <Description>
-      This is the base client by Composed Health Ltd.
-    </Description>
+    <Authors>Mike Samy</Authors>
+    <Company>Composed Health Ltd</Company>
+    <PackageTags>Composed Health;ClientBase;Blazor;Multi-tenant</PackageTags>
+    <Description>Client-side Blazor components and services for building multi-tenant applications</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/drmikesamy/Boxty</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/drmikesamy/Boxty</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -28,6 +33,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SharedBase\Boxty.SharedBase.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

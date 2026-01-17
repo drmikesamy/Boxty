@@ -2,7 +2,7 @@
 @using Boxty.SharedBase.Interfaces
 @using Boxty.ClientBase.Services
 @inject IAuthHelperService AuthHelperService
-@typeparam T where T : class, IDto, IAuditDto, ILazyLookup, ISubject
+@typeparam T where T : class, IDto, IAuditDto, IAutoCrud, ISubject
 
 @if (FormMode == FormModeEnum.Edit)
 {

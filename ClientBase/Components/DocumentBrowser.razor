@@ -9,11 +9,11 @@
 @typeparam TValidator where TValidator : IValidator, new()
 @inject IAuthHelperService AuthHelper
 @inject IDialogService DialogService
-@inject ILazyLookupService<TDto> LookupService
+@inject ICrudService<TDto> LookupService
 @inject IDocumentUploadService DocumentUploadService
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
-@typeparam TDto where TDto : IAuditDto, IDocumentDto, ILazyLookup
+@typeparam TDto where TDto : IAuditDto, IDocumentDto, IAutoCrud
 @implements IAsyncDisposable
 
 <MudPaper Class="pa-4">

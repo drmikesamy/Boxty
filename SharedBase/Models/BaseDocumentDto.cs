@@ -3,7 +3,7 @@ using Boxty.SharedBase.Interfaces;
 
 namespace Boxty.SharedBase.Models
 {
-    public class BaseDocumentDto : BaseDto<BaseDocumentDto>, IDto, IAuditDto, IDocumentDto, ILazyLookup
+    public class BaseDocumentDto : BaseDto<BaseDocumentDto>, IDto, IAuditDto, IDocumentDto, IAutoCrud
     {
         public string BlobName { get; set; } = string.Empty;
         public string BlobContainerName { get; set; } = string.Empty;

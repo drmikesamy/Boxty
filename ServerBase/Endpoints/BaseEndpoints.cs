@@ -209,15 +209,15 @@ namespace Boxty.ServerBase.Endpoints
         {
             try
             {
-                // Only pass the filter if TDto implements ILazyLookup
+                // Only pass the filter if TDto implements IAutoCrud
                 PagedResult<TDto> pagedResult;
-                if (typeof(ILazyLookup).IsAssignableFrom(typeof(TDto)))
+                if (typeof(IAutoCrud).IsAssignableFrom(typeof(TDto)))
                 {
                     pagedResult = await getPagedQuery.Handle(page, pageSize, user, filter, tenantId, subjectId);
                 }
                 else
                 {
-                    // For DTOs that don't implement ILazyLookup, ignore the SearchTerm filter
+                    // For DTOs that don't implement IAutoCrud, ignore the SearchTerm filter
                     var basicFilter = filter != null ? new FetchFilter
                     {
                         IsActive = filter.IsActive,

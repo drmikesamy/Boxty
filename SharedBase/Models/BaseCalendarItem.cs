@@ -3,7 +3,7 @@ using Boxty.SharedBase.DTOs;
 using Heron.MudCalendar;
 namespace Boxty.SharedBase.Models
 {
-    public class BaseCalendarItem : CalendarItem, IDto, IAuditDto, ILazyLookup
+    public class BaseCalendarItem : CalendarItem, IDto, IAuditDto, IAutoCrud
     {
         public DateTime? StartTime
         {

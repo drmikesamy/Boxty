@@ -6,10 +6,15 @@
     <Nullable>enable</Nullable>
 	<PackageId>Boxty.ServerBase</PackageId>
     <Version>1.0.0</Version>
-    <PackageTags>Composed Health;ServerBase</PackageTags>
-    <Description>
-      This is the base server by Composed Health Ltd.
-    </Description>
+    <Authors>Mike Samy</Authors>
+    <Company>Composed Health Ltd</Company>
+    <PackageTags>Composed Health;ServerBase;ASP.NET Core;Multi-tenant;Keycloak</PackageTags>
+    <Description>Server-side infrastructure for building multi-tenant APIs with Keycloak authentication</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/drmikesamy/Boxty</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/drmikesamy/Boxty</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <ItemGroup>
@@ -41,6 +46,10 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\SharedBase\Boxty.SharedBase.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Include="..\README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
 
 </Project>

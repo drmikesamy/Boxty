@@ -6,8 +6,8 @@
 @using Boxty.SharedBase.DTOs
 @using Boxty.SharedBase.Interfaces
 @using System.Linq.Expressions
-@typeparam TDto where TDto : IDto, ILazyLookup
-@inject ILazyLookupService<TDto> LookupService
+@typeparam TDto where TDto : IDto, IAutoCrud
+@inject ICrudService<TDto> LookupService
 
 @switch (FieldType)
 {

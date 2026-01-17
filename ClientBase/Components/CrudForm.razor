@@ -10,10 +10,10 @@
 @using Boxty.SharedBase.Enums
 @inject IDialogService DialogService
 @inject IValidator<T> Validator
-@inject ILazyLookupService<T> LookupService
+@inject ICrudService<T> LookupService
 @inject ILocalBackupService LocalBackupService
 @inject ISnackbar Snackbar
-@typeparam T where T : class, IDto, IAuditDto, ILazyLookup
+@typeparam T where T : class, IDto, IAuditDto, IAutoCrud
 
 <CascadingValue Name="Model" Value="@Model" IsFixed="false">
     <CascadingValue Name="FormMode" Value="@FormMode" IsFixed="false">
