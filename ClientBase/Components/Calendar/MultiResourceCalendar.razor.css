@@ -1,0 +1,45 @@
+.calendar-resource-group {
+  display: flex;
+  width: 100%;
+  gap: 0;
+  height: 500px;
+  overflow: auto;
+}
+
+.calendar-resource-group > .calendar-resource {
+  flex: 1 1 0;
+  max-width: 100%;
+  margin-left: 10px;
+}
+
+.calendar-resource-group > .calendar-resource .calendar-resource-header {
+  position: sticky;
+  top: 0;
+  background-color: white;
+  z-index: 100;
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+}
+.calendar-resource-group > .calendar-resource .calendar-resource-header .calendar-resource-header-inner {
+  width: 240px;
+  display: inline-block;
+  text-wrap: nowrap;
+  overflow: hidden;
+}
+
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-grid-header.mud-cal-work-week-header,
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-grid.mud-cal-work-week-grid {
+  grid-template-columns: 0px repeat(5, 1fr);
+}
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-grid-header.mud-cal-week-header,
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-grid.mud-cal-week-grid {
+  grid-template-columns: 0px repeat(7, 1fr);
+}
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-grid-header.mud-cal-day-header,
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-grid.mud-cal-day-grid {
+  grid-template-columns: 0px repeat(1, 1fr);
+}
+.calendar-resource-group :not(:first-child) ::deep .mud-cal-time-cell {
+  color: transparent;
+}
+
+/*# sourceMappingURL=MultiResourceCalendar.razor.css.map */

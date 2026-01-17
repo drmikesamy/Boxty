@@ -1,0 +1,195 @@
+@namespace Boxty.ClientBase.Components.Calendar
+@using Boxty.ClientBase.Components.Calendar
+@using Boxty.ClientBase.Components.Calendar.Events
+@using Boxty.SharedBase.DTOs
+@using Boxty.SharedBase.Interfaces
+@using Boxty.SharedBase.Models
+@using Heron.MudCalendar
+@using System.Text.Json
+@using MudBlazor.Extensions
+@using System.Globalization
+@typeparam TResource where TResource : ICalendarResource<TCalendarItem>, IDto, ISubject, ILazyLookup
+@typeparam TCalendarItem where TCalendarItem : BaseCalendarItem
+@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, ILazyLookup
+
+<MudGrid Class="align-center">
+<MudItem xs="12" sm="6" md="3">
+            <MudButtonGroup Color="Color.Primary" Variant="Variant.Text">
+                <MudButton Variant="Variant.Text">@CurrentDay.ToString("MMM yy")</MudButton>
+        <MudButton OnClick="() => PrevClicked()">
+            <MudIcon Icon="@Icons.Material.TwoTone.ChevronLeft" />
+        </MudButton>
+        <MudButton OnClick="() => TodayClicked()">Today</MudButton>
+        <MudButton OnClick="() => NextClicked()">
+            <MudIcon Icon="@Icons.Material.TwoTone.ChevronRight"/>
+        </MudButton>
+</MudButtonGroup>
+        </MudItem>
+        <MudItem xs="12" sm="6" md="6">
+                    <MudToggleGroup T="CalendarView" SelectionMode="SelectionMode.SingleSelection" @bind-Value="CalendarView">
+            <MudToggleItem Value="@(CalendarView.Day)" Text="Day" />
+            <MudToggleItem Value="@(CalendarView.Week)" Text="Week" />
+            <MudToggleItem Value="@(CalendarView.WorkWeek)" Text="Work Week" />
+            <MudToggleItem Value="@(CalendarView.Month)" Text="Month" />
+        </MudToggleGroup>
+        </MudItem>
+        <MudItem xs="12" sm="12" md="3">
+        <MudSelect MultiSelectionTextFunc="@(new Func<List<string>, string>(GetMultiSelectionGuid))" T="string" ReadOnly="SelectedResource != string.Empty"
+            Label="Select Resources" MultiSelection="true" @bind-Value="_value"
+            @bind-SelectedValues="_selectedResources">
+            @foreach (var resource in Resources)
+            {
+                <MudSelectItem T="string" Value="@resource.Id.ToString()">@($"{resource.FirstName} {resource.LastName}")</MudSelectItem>
+            }
+        </MudSelect>
+        </MudItem>
+</MudGrid>
+
+@if (_selectedResources.Count() == 0)
+{
+    <MudPaper Class="pa-8 ma-2 max-w-xl">
+        <MudText Typo="Typo.h6">Please select some resources to start.</MudText>
+    </MudPaper>
+}
+else
+{
+<MudStack Row="true" Wrap="Wrap.NoWrap" Style="overflow-x: auto;">
+    @foreach (var resource in Resources.Where(r => _selectedResources.Contains(r.Id.ToString())))
+    {
+        <MudContainer MaxWidth="MaxWidth.False" Class="ma-0 pa-0">
+<MudCard Style="min-width: 300px;">
+                            <MudCardHeader Style="@($"color:{Colors.Shades.White}; background:{Colors.Blue.Lighten1};")">
+                                <CardHeaderAvatar>
+                                    <AvatarImage TDto="TResource" TDocumentDto="TDocumentDto" Letter="@($"{resource.FirstName?.Substring(0, 1).ToUpper()} {resource.LastName?.Substring(0,1).ToUpper()}")" AvatarImageGuid="@resource.AvatarImageGuid" />
+                                </CardHeaderAvatar>
+                                <CardHeaderContent>
+                                    <MudText Typo="Typo.body1">@($"{resource.FirstName} {resource.LastName}")</MudText>
+                                </CardHeaderContent>
+                            </MudCardHeader>
+                            <MudCardContent Style="@($"background:{Colors.Blue.Lighten5};")">
+                            <CustomMudCalendar 
+                                TCalendarItem="TCalendarItem" 
+                                CurrentDay=@CurrentDay 
+                                ShowDay="CalendarView == CalendarView.Day"
+                                ShowWeek="CalendarView == CalendarView.Week" 
+                                ShowWorkWeek="CalendarView == CalendarView.WorkWeek"
+                                ShowMonth="CalendarView == CalendarView.Month" 
+                                ShowCurrentTime="true"
+                                Items="@resource.CalendarItems" 
+                                FirstDayOfWorkWeek="DayOfWeek.Monday"
+                                FirstDayOfWeek="DayOfWeek.Monday" 
+                                ShowToolbar="false"
+                                CellClicked="(d) => CellClicked(d, resource)" 
+                                ItemClicked="ItemClicked">
+                                <CellTemplate>
+                                    @if (ChildContent != null)
+                                    {
+                                        @ChildContent(context)
+                                    }
+                                </CellTemplate>
+                            </CustomMudCalendar>
+                            </MudCardContent>
+                        </MudCard>
+        </MudContainer>                    
+    }
+</MudStack>
+}
+
+@code {
+    [Parameter] public IEnumerable<TResource> Resources { get; set; } = new List<TResource>();
+    [Parameter] public EventCallback<ItemClickedEventArgs<TCalendarItem>> ItemClickedCallback { get; set; }
+    [Parameter] public EventCallback<CellClickedEventArgs<TResource, TCalendarItem>> CellClickedCallback { get; set; }
+    [Parameter] public string SelectedResource { get; set; } = string.Empty;
+    [Parameter] public RenderFragment<TCalendarItem>? ChildContent { get; set; }
+    private string GetColor(Color color) => $"var(--mud-palette-{color.ToDescriptionString()})";
+    private DateTime CurrentDay = DateTime.Today;
+    private CalendarView CalendarView { get; set; } = CalendarView.WorkWeek;
+
+    private string _value = string.Empty;
+    private IEnumerable<string> _selectedResources = new List<string>();
+
+    protected override void OnParametersSet()
+    {
+        if (!string.IsNullOrEmpty(SelectedResource))
+        {
+            _selectedResources = new List<string> { SelectedResource };
+            StateHasChanged();
+        }
+    }
+
+    private void SwitchToDayView()
+    {
+        CalendarView = CalendarView.Day;
+    }
+
+    private void SwitchToWeekView()
+    {
+        CalendarView = CalendarView.Week;
+    }
+
+    private void SwitchToWorkWeekView()
+    {
+        CalendarView = CalendarView.WorkWeek;
+    }
+
+    private void SwitchToMonthView()
+    {
+        CalendarView = CalendarView.Month;
+    }
+
+    private void PrevClicked()
+    {
+        switch (CalendarView)
+        {
+            case CalendarView.Day:
+                CurrentDay = CurrentDay.AddDays(-1);
+                break;
+            case CalendarView.Week:
+                CurrentDay = CurrentDay.AddDays(-7);
+                break;
+            case CalendarView.WorkWeek:
+                CurrentDay = CurrentDay.AddDays(-7);
+                break;
+            case CalendarView.Month:
+                CurrentDay = CurrentDay.AddMonths(-1);
+                break;
+        }
+    }
+
+    private void NextClicked()
+    {
+        switch (CalendarView)
+        {
+            case CalendarView.Day:
+                CurrentDay = CurrentDay.AddDays(1);
+                break;
+            case CalendarView.Week:
+                CurrentDay = CurrentDay.AddDays(7);
+                break;
+            case CalendarView.WorkWeek:
+                CurrentDay = CurrentDay.AddDays(7);
+                break;
+            case CalendarView.Month:
+                CurrentDay = CurrentDay.AddMonths(1);
+                break;
+        }
+    }
+    private void TodayClicked()
+    {
+        CurrentDay = DateTime.Today;
+    }
+    private string GetMultiSelectionGuid(List<string> selectedValues)
+    {
+        return $"Selected clinicians: {(selectedValues.Count() == 0 ? "(None)" : string.Join(", ", Resources.Where(r => selectedValues.Contains(r.Id.ToString())).Select(x => $"{x.FirstName} {x.LastName}")))}";
+    }
+
+    private void CellClicked(DateTime dateTime, TResource resource)
+    {
+        CellClickedCallback.InvokeAsync(new CellClickedEventArgs<TResource, TCalendarItem>(dateTime, resource));
+    }
+
+    private void ItemClicked(TCalendarItem item)
+    {
+        ItemClickedCallback.InvokeAsync(new ItemClickedEventArgs<TCalendarItem>(item));
+    }
+}

@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <PackageId>Boxty.SharedBase</PackageId>
+    <Version>1.0.0</Version>
+    <PackageTags>Composed Health;SharedBase</PackageTags>
+    <Description>
+      This is the base shared library by Composed Health Ltd.
+    </Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Heron.MudCalendar" Version="3.0.0" />
+    <PackageReference Include="FluentValidation" Version="11.9.2" />
+  </ItemGroup>
+
+</Project>

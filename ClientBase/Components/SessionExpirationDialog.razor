@@ -1,0 +1,103 @@
+@namespace Boxty.ClientBase.Components
+@using MudBlazor
+@using Microsoft.Extensions.Logging
+@implements IDisposable
+@inject ILogger<SessionExpirationDialog> Logger
+
+<MudDialog>
+    <DialogContent>
+        <div class="d-flex flex-column align-center pa-4">
+            <MudIcon Icon="@Icons.Material.Filled.AccessTime" Size="Size.Large" Color="Color.Warning" Class="mb-4" />
+            <MudText Typo="Typo.h6" Class="mb-2">Session Expiring Soon</MudText>
+            <MudText Typo="Typo.body1" Align="Align.Center" Class="mb-2">
+                Your session will expire in:
+            </MudText>
+            <MudText Typo="Typo.h5" Align="Align.Center" Class="mb-4" Color="Color.Warning">
+                @_currentTimeRemaining.ToString(@"mm\:ss")
+            </MudText>
+            <MudText Typo="Typo.body2" Align="Align.Center" Class="mb-4">
+                Would you like to continue your session?
+            </MudText>
+            
+            @* Debug Information *@
+            <MudExpansionPanels Class="mb-4">
+                <MudExpansionPanel Text="Debug Info">
+                    <div class="d-flex flex-column gap-1">
+                        <MudText Typo="Typo.caption">Initial Time: @TimeRemaining.ToString(@"mm\:ss")</MudText>
+                        <MudText Typo="Typo.caption">Current Time: @_currentTimeRemaining.ToString(@"mm\:ss")</MudText>
+                        <MudText Typo="Typo.caption">Current UTC: @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")</MudText>
+                        <MudText Typo="Typo.caption">Timer Active: @(_timer != null ? "Yes" : "No")</MudText>
+                    </div>
+                </MudExpansionPanel>
+            </MudExpansionPanels>
+            <div class="d-flex gap-2">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ContinueSession">
+                    Continue Session
+                </MudButton>
+                <MudButton Variant="Variant.Outlined" OnClick="Logout">
+                    Logout
+                </MudButton>
+            </div>
+        </div>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [CascadingParameter] 
+    IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter] 
+    public TimeSpan TimeRemaining { get; set; }
+
+    private TimeSpan _currentTimeRemaining;
+    private System.Threading.Timer? _timer;
+
+    protected override void OnInitialized()
+    {
+        _currentTimeRemaining = TimeRemaining;
+        
+        Logger.LogInformation("SessionExpirationDialog initialized with {InitialTimeRemaining:F0} seconds remaining", _currentTimeRemaining.TotalSeconds);
+        
+        // Start a timer that updates every second
+        _timer = new System.Threading.Timer(UpdateCountdown, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(1));
+    }
+
+    private void UpdateCountdown(object? state)
+    {
+        _currentTimeRemaining = _currentTimeRemaining.Subtract(TimeSpan.FromSeconds(1));
+        
+        Logger.LogDebug("Countdown updated: {RemainingSeconds:F0} seconds remaining", _currentTimeRemaining.TotalSeconds);
+        
+        // If time has expired, automatically logout
+        if (_currentTimeRemaining <= TimeSpan.Zero)
+        {
+            Logger.LogWarning("Session timer expired! Auto-logging out...");
+            _timer?.Dispose();
+            InvokeAsync(() => Logout());
+            return;
+        }
+
+        // Update the UI
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ContinueSession()
+    {
+        Logger.LogInformation("User clicked 'Continue Session' with {RemainingSeconds:F0} seconds left on timer", _currentTimeRemaining.TotalSeconds);
+        _timer?.Dispose();
+        MudDialog.Close(DialogResult.Ok(true));
+    }
+
+    private void Logout()
+    {
+        Logger.LogInformation("User clicked 'Logout' or session expired with {RemainingSeconds:F0} seconds left on timer", _currentTimeRemaining.TotalSeconds);
+        _timer?.Dispose();
+        MudDialog.Close(DialogResult.Ok(false));
+    }
+
+    public void Dispose()
+    {
+        Logger.LogInformation("SessionExpirationDialog disposed");
+        _timer?.Dispose();
+    }
+}

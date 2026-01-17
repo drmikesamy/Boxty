@@ -1,0 +1,59 @@
+@namespace Boxty.ClientBase.Components
+
+@using Boxty.ClientBase.Services
+@using Boxty.SharedBase.DTOs
+@using Boxty.SharedBase.Interfaces
+@inject IDocumentUploadService DocumentUploadService
+@inject ILazyLookupService<TDto> LazyLookupService
+@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, ILazyLookup
+@typeparam TDto where TDto : IDto, ISubject, ILazyLookup
+
+@if (CurrentAvatarUrl != null)
+{
+    <MudAvatar Size="@Size">
+        <MudImage Src="@CurrentAvatarUrl"/>
+    </MudAvatar>
+}
+else
+{
+    <MudAvatar Color="Color.Primary" Size="@Size">@Letter</MudAvatar>
+}
+
+@code{
+    [Parameter] public Guid AvatarImageGuid { get; set; } = Guid.Empty;
+    [Parameter] public Guid UserId { get; set; } = Guid.Empty;  
+    [Parameter] public string Letter { get; set; } = "...";
+    [Parameter] public MudBlazor.Size Size { get; set; } = MudBlazor.Size.Medium;
+    private string? CurrentAvatarUrl = null;
+    protected override async Task OnParametersSetAsync()
+    {
+        CurrentAvatarUrl = null;
+        
+        if (AvatarImageGuid != Guid.Empty)
+        {
+            CurrentAvatarUrl = await DocumentUploadService.GetSasLink<TDocumentDto>(AvatarImageGuid, CancellationToken.None);
+        }
+        else if (UserId != Guid.Empty)
+        {
+            var user = await LazyLookupService.GetItemById(UserId, CancellationToken.None);
+            if (user != null && user is ISubject subject && subject.AvatarImageGuid != Guid.Empty)
+            {
+                CurrentAvatarUrl = await DocumentUploadService.GetSasLink<TDocumentDto>(subject.AvatarImageGuid, CancellationToken.None);
+            }
+            else
+            {
+            }
+        }
+        else
+        {
+        }
+        
+        // Normalize the letter parameter regardless of avatar loading success
+        if (!string.IsNullOrEmpty(Letter))
+        {
+            Letter = Letter.Length > 1 ? Letter.Substring(0, 1).ToUpper() : Letter.ToUpper();
+        }
+        
+        StateHasChanged();
+    }
+}

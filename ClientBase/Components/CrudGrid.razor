@@ -1,0 +1,305 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.ClientBase.Services
+@using Boxty.ClientBase.Enums
+@using Boxty.SharedBase.Interfaces
+@using Boxty.SharedBase.Models
+@using MudBlazor
+@typeparam T where T : class, IDto, IAuditDto, ILazyLookup
+@inject ILazyLookupService<T> LookupService
+@inject IAuthHelperService AuthHelperService
+@inject NavigationManager NavigationManager
+
+@* <p>Tenant ID: @Tenant?.Id</p>
+<p>Subject ID: @Subject?.Id</p> *@
+
+@if (_isLoading)
+{
+    <MudCard Elevation="1">
+        <MudCardContent Class="pa-0">
+            <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                <MudSkeleton Width="25%" Height="40px" />
+                <MudSkeleton Width="20%" Height="40px" />
+                <MudSkeleton Width="17.5%" Height="40px" />
+                <MudSkeleton Width="20%" Height="40px" />
+                <MudSkeleton Width="17.5%" Height="40px" />
+            </MudStack>
+            @for (int i = 0; i < 10; i++)
+            {
+                <MudStack Row="true" Spacing="2" AlignItems="AlignItems.Center">
+                    <MudSkeleton Width="25%" Height="40px" />
+                    <MudSkeleton Width="20%" Height="40px" />
+                    <MudSkeleton Width="17.5%" Height="40px" />
+                    <MudSkeleton Width="20%" Height="40px" />
+                    <MudSkeleton Width="17.5%" Height="40px" />
+                </MudStack>
+            }
+        </MudCardContent>
+    </MudCard>
+}
+else
+{
+    <MudDataGrid T="T" Dense="true" Hover="true" Striped="true" Bordered="true" Filterable="true" Loading="_isLoading"
+        LoadingProgressColor="Color.Info" Items="_filteredItems" QuickFilter="_quickFilter"
+        RowClick="@(context => OnItemSelected.InvokeAsync(context.Item))" SortMode="@SortMode">
+        <ToolBarContent>
+            <MudText Typo="Typo.h5">@($"{Title}s")</MudText>
+            <MudSpacer />
+            @if (!HideQuickFilter){
+            <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="ma-2" Variant="Variant.Text">
+            </MudTextField>
+            }
+            <MudSelect Class="ma-2" T="ActiveFilterEnum" @bind-Value="_activeFilter" Variant="Variant.Text"
+                @bind-Value:after="OnFilterChanged" Style="min-width: 125px;">
+                @foreach (ActiveFilterEnum value in Enum.GetValues<ActiveFilterEnum>())
+                {
+                    <MudSelectItem Value="@value">@value</MudSelectItem>
+                }
+            </MudSelect>
+            @if (!HideAddButton){
+                <MudButton Class="ma-2" Variant="Variant.Filled" Color="Color.Primary" OnClick="ShowCreateDialog"
+                    StartIcon="@Icons.Material.Filled.Add" Disabled="_isLoading" Size="Size.Small">
+                    Add @Title
+                </MudButton>
+            }
+            <MudIconButton Class="ma-2" Icon="@Icons.Material.Filled.Refresh" OnClick="RefreshData" Disabled="_isLoading"
+                Size="Size.Small" />
+        </ToolBarContent>
+        <Columns>
+            @ChildContent
+            <TemplateColumn Title="Status" Sortable="false" Hidden="@(!ShowIsActive)">
+                <CellTemplate>
+                    <MudChip T="string" Size="Size.Small" Color="@(context.Item.IsActive? Color.Success: Color.Error)">
+                        @(context.Item.IsActive ? "Active" : "Archived")
+                    </MudChip>
+                </CellTemplate>
+            </TemplateColumn>
+            <TemplateColumn Title="Actions" Sortable="false" Filterable="false" Hidden="@HideActions">
+                <CellTemplate>
+                    <MudStack Row="true" Spacing="1">
+                        <MudTooltip Text="Edit">
+                            <MudIconButton Size="Size.Small" Color="Color.Primary" Variant="Variant.Outlined"
+                                OnClick="() => EditItem(context.Item)" Icon="@Icons.Material.Filled.Edit"
+                                Disabled="_isLoading">
+                            </MudIconButton>
+                        </MudTooltip>
+                        @if (!string.IsNullOrEmpty(LinkButtonRouteIdPrefix))
+                        {
+                            <MudTooltip Text="View/Edit">
+                                <MudIconButton Size="Size.Small" Color="Color.Info" Variant="Variant.Outlined"
+                                    OnClick="@(() => NavigationManager.NavigateTo($"{LinkButtonRouteIdPrefix}/{context.Item.Id}"))"
+                                    Icon="@Icons.Material.Filled.ReadMore" Disabled="_isLoading">
+                                </MudIconButton>
+                            </MudTooltip>
+                        }
+                        @CustomButtons
+                    </MudStack>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudText>No records found.</MudText>
+        </NoRecordsContent>
+        <PagerContent>
+            <MudDataGridPager T="T" />
+        </PagerContent>
+    </MudDataGrid>
+}
+
+<MudDialog @bind-Visible="_dialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h4">@(FormMode == FormModeEnum.Edit ? $"Edit {Title}" : $"Create New {Title}")</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (ItemForm != null)
+        {
+            <CascadingValue Value="@Tenant" Name="Tenant" IsFixed="false">
+                <CascadingValue Value="@Subject" Name="Subject" IsFixed="false">
+                    <CrudForm T="T" Model="@_currentItem" FormMode="@FormMode" OnCancel="CancelDialog" OnAdd="ItemAdded"
+                        OnUpdate="ItemUpdated" OnDelete="ItemDeleted" IsModal="true" OnBeforeSave="OnBeforeSave"
+                        CanFinalise="CanFinalise">
+                        <ChildContent>
+                            @ItemForm
+                        </ChildContent>
+                        <CustomButtons>
+                            @CustomButtons
+                        </CustomButtons>
+                    </CrudForm>
+                </CascadingValue>
+            </CascadingValue>
+        }
+        else
+        {
+            <MudText Color="Color.Warning">No dialog content provided</MudText>
+        }
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [Parameter] public string LinkButtonRouteIdPrefix { get; set; } = string.Empty;
+    [CascadingParameter(Name = "Tenant")] public ITenant Tenant { get; set; } = default!;
+    [CascadingParameter(Name = "Subject")] public ISubject Subject { get; set; } = default!;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [Parameter] public RenderFragment ItemForm { get; set; } = default!;
+    [Parameter] public RenderFragment? CustomButtons { get; set; } = default!;
+    [Parameter] public bool ShowIsActive { get; set; } = true;
+    [Parameter] public EventCallback<T> OnItemSelected { get; set; }
+    [Parameter] public EventCallback<T> OnBeforeSave { get; set; }
+    [Parameter] public bool CanFinalise { get; set; } = false;
+    [Parameter] public bool HideActions { get; set; } = false;
+    [Parameter] public bool HideAddButton { get; set; } = false;
+    [Parameter] public bool HideQuickFilter { get; set; } = false;
+    [Parameter] public SortMode SortMode { get; set; } = SortMode.Single;
+    [Parameter] public IEnumerable<T>? Items { get; set; }
+    [Parameter] public Func<T, string, bool>? CustomQuickFilter { get; set; }
+    private FormModeEnum FormMode { get; set; } = FormModeEnum.Create;
+    private string _searchString = string.Empty;
+    public string Title => typeof(T).Name.Replace("Dto", string.Empty);
+    private IEnumerable<T> _items = default!;
+    private bool _isLoading = false;
+    private bool _dialogOpen = false;
+    private T _currentItem = default!;
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Medium, FullWidth = true };
+    private ActiveFilterEnum _activeFilter = ActiveFilterEnum.Active;
+
+    private IEnumerable<T> _filteredItems
+    {
+        get
+        {
+            if (_items == null)
+                return Enumerable.Empty<T>();
+
+            return _activeFilter switch
+            {
+                ActiveFilterEnum.Active => _items.Where(item => item.IsActive),
+                ActiveFilterEnum.Archived => _items.Where(item => !item.IsActive),
+                ActiveFilterEnum.All => _items,
+                _ => _items
+            };
+        }
+    }
+    private Func<T, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        if (CustomQuickFilter != null)
+            return CustomQuickFilter(x, _searchString);
+
+        if (x is IDateOfBirth dob)
+        {
+            if (dob.DOB.HasValue && dob.DOB.Value.ToString().Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        if (x.DisplayName.Contains(_searchString, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (Items != null)
+        {
+            _items = Items.OrderByDescending(i => i.ModifiedDate);
+        }
+        else
+        {
+            await RefreshData();
+        }
+    }
+
+    private async Task RefreshData()
+    {
+        _isLoading = true;
+        _items = (await LookupService.GetAllItems(CancellationToken.None, Tenant?.Id, Subject?.Id)).OrderByDescending(i =>
+        i.ModifiedDate);
+        _dialogOpen = false;
+        _isLoading = false;
+        StateHasChanged();
+    }
+
+    private void OnFilterChanged()
+    {
+        StateHasChanged();
+    }
+
+    private void ShowCreateDialog()
+    {
+        try
+        {
+            _currentItem = Activator.CreateInstance<T>() ?? throw new InvalidOperationException("Could not create instance of T");
+            FormMode = FormModeEnum.Create;
+            _dialogOpen = true;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void EditItem(T item)
+    {
+        try
+        {
+            if (item == null)
+                return;
+
+            // Create a copy of the item to avoid binding conflicts
+            _currentItem = item;
+            FormMode = FormModeEnum.Edit;
+            _dialogOpen = true;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private async Task ItemAdded(T item)
+    {
+        await RefreshData();
+        _dialogOpen = false;
+        EditItem(item);
+    }
+
+    private async Task ItemUpdated(T item)
+    {
+        await RefreshData();
+    }
+
+    private async Task ItemDeleted(T item)
+    {
+        await RefreshData();
+        _dialogOpen = false;
+    }
+
+    private void CancelDialog()
+    {
+        try
+        {
+            _dialogOpen = false;
+            _currentItem = default!;
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private async Task<GridData<T>> ServerReload(GridState<T> state)
+    {
+        //TODO: Future pagination when lists get mega big
+        var filter = new FetchFilter();
+
+        var pagedResult = await LookupService.GetItemsPaged(state.Page + 1, state.PageSize, CancellationToken.None, filter,
+        Tenant?.Id, Subject?.Id);
+
+        return new GridData<T>
+        {
+            TotalItems = pagedResult.TotalCount,
+            Items = pagedResult.Items
+        };
+    }
+}

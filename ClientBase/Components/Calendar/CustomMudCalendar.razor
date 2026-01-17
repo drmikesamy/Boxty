@@ -1,0 +1,21 @@
+@namespace Boxty.ClientBase.Components.Calendar
+@using Boxty.SharedBase.Models
+@using Heron.MudCalendar;
+@using Boxty.ClientBase.Components.Calendar.CustomWeekView;
+@using Boxty.ClientBase.Components.Calendar.CustomWorkWeekView;
+@using Boxty.ClientBase.Components.Calendar.CustomMonthView;
+@using Boxty.ClientBase.Components.Calendar.CustomDayView;
+
+@inherits MudCalendar<TCalendarItem>
+@typeparam TCalendarItem where TCalendarItem : BaseCalendarItem
+
+@Render
+
+@code {
+    protected override RenderFragment RenderWeekView =>
+    @<CustomWeekView TCalendarItem="TCalendarItem" />;
+    protected override RenderFragment RenderWorkWeekView =>
+    @<CustomWorkWeekView TCalendarItem="TCalendarItem" />;
+    protected override RenderFragment RenderMonthView =>
+    @<CustomMonthView TCalendarItem="TCalendarItem" />;
+}

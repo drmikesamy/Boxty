@@ -1,0 +1,345 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.ClientBase.Services
+@using Boxty.SharedBase.Interfaces
+@using Boxty.SharedBase.DTOs
+@using MudBlazor
+@using System.Collections
+@inject ILocalBackupService LocalBackupService
+@typeparam T where T : class, IDto, IAuditDto, ILazyLookup
+
+<!-- Backup Review Dialog -->
+<MudDialog @bind-Visible="@_internalVisible" Options="@dialogOptions">
+    <DialogContent>
+        <MudContainer>
+            <MudText Typo="Typo.h6" GutterBottom="true">Backup History</MudText>
+            
+            @if (backupHistory != null && backupHistory.Any())
+            {
+                <MudStack Spacing="3">
+                    <!-- Navigation -->
+                    <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Style="margin-bottom: 16px; background-color: #f5f5f5; padding: 12px; border-radius: 8px;">
+                        <!-- Previous Button -->
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowBackIos" 
+                                         Size="Size.Large"
+                                         Color="Color.Primary"
+                                         Variant="Variant.Filled"
+                                         Disabled="@(currentBackupIndex >= backupHistory.Count - 1)"
+                                         OnClick="@PreviousBackup" />
+                            <MudButton Variant="Variant.Text" 
+                                     Size="Size.Small"
+                                     Disabled="@(currentBackupIndex >= backupHistory.Count - 1)"
+                                     OnClick="@PreviousBackup">
+                                Previous
+                            </MudButton>
+                        </MudStack>
+                        
+                        <!-- Center Info -->
+                        <MudStack AlignItems="AlignItems.Center">
+                            <MudText Typo="Typo.subtitle1" Align="Align.Center" Style="font-weight: bold;">
+                                Backup @(@backupHistory.Count - currentBackupIndex) of @backupHistory.Count
+                            </MudText>
+                            @if (currentBackupMetadata != null)
+                            {
+                                <MudText Typo="Typo.caption" Align="Align.Center">
+                                    Saved: @currentBackupMetadata.CreatedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                                </MudText>
+                            }
+                        </MudStack>
+                        
+                        <!-- Next Button -->
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+                            <MudButton Variant="Variant.Text" 
+                                     Size="Size.Small"
+                                     Disabled="@(currentBackupIndex <= 0)"
+                                     OnClick="@NextBackup">
+                                Next
+                            </MudButton>
+                            <MudIconButton Icon="@Icons.Material.Filled.ArrowForwardIos" 
+                                         Size="Size.Large"
+                                         Color="Color.Primary"
+                                         Variant="Variant.Filled"
+                                         Disabled="@(currentBackupIndex <= 0)"
+                                         OnClick="@NextBackup" />
+                        </MudStack>
+                    </MudStack>
+
+                    <!-- Backup Content Display -->
+                    <MudPaper Elevation="1" Style="padding: 16px; max-height: 400px; overflow-y: auto;">
+                        @if (backupHistory.Count > currentBackupIndex && backupHistory[currentBackupIndex] != null)
+                        {
+                            @RenderBackupProperties(backupHistory[currentBackupIndex]!)
+                        }
+                        else
+                        {
+                            <MudText Typo="Typo.body2">No data available</MudText>
+                        }
+                    </MudPaper>
+
+                    <!-- Action Buttons -->
+                    <MudStack Row="true" Justify="Justify.FlexEnd" Spacing="2">
+                        <MudButton Variant="Variant.Outlined" 
+                                 OnClick="@CloseDialog">
+                            Cancel
+                        </MudButton>
+                        <MudButton Variant="Variant.Filled" 
+                                 Color="Color.Primary" 
+                                 OnClick="@RestoreSelectedBackup">
+                            Restore This Backup
+                        </MudButton>
+                    </MudStack>
+                </MudStack>
+            }
+            else
+            {
+                <MudText Typo="Typo.body1">No backups found for this item.</MudText>
+                <MudButton Variant="Variant.Outlined" 
+                         Style="margin-top: 16px;"
+                         OnClick="@CloseDialog">
+                    Close
+                </MudButton>
+            }
+        </MudContainer>
+    </DialogContent>
+</MudDialog>
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    [Parameter] public T? Model { get; set; }
+    [Parameter] public EventCallback<T> OnBackupRestored { get; set; }
+    
+    private List<T?> backupHistory = new();
+    private List<BackupMetadata> backupMetadataHistory = new();
+    private int currentBackupIndex = 0;
+    private BackupMetadata? currentBackupMetadata;
+    private bool _wasVisible = false;
+    private bool _internalVisible = false;
+    
+    private DialogOptions dialogOptions = new() 
+    { 
+        FullWidth = true, 
+        MaxWidth = MaxWidth.Medium,
+        CloseButton = true,
+        CloseOnEscapeKey = true
+    };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (IsVisible && !_wasVisible && Model != null)
+        {
+            _internalVisible = true;
+            await LoadBackupHistory();
+        }
+        else if (!IsVisible && _wasVisible)
+        {
+            _internalVisible = false;
+        }
+        
+        _wasVisible = IsVisible;
+    }
+
+    private async Task LoadBackupHistory()
+    {
+        try
+        {
+            var backupKey = $"{typeof(T).Name}_{Model!.Id}";
+            
+            // Get current/most recent backup
+            var currentBackup = await LocalBackupService.RestoreSilentAsync<T>(backupKey);
+            
+            // Get the last 4 previous backups  
+            var previousBackups = await ((LocalBackupService)LocalBackupService).GetLastFiveBackupsAsync<T>(backupKey);
+            
+            // Clear existing data
+            backupHistory.Clear();
+            backupMetadataHistory.Clear();
+            
+            // Add most recent backup first
+            if (currentBackup != null)
+            {
+                backupHistory.Add(currentBackup);
+                var currentMetadata = await LocalBackupService.GetBackupMetadataAsync(backupKey);
+                backupMetadataHistory.Add(currentMetadata ?? new BackupMetadata 
+                { 
+                    CreatedAt = DateTime.Now,
+                    ObjectType = typeof(T).Name
+                });
+            }
+            
+            // Add previous backups (they're already in newest-to-oldest order)
+            if (previousBackups != null)
+            {
+                backupHistory.AddRange(previousBackups);
+                
+                // For metadata of previous backups, we'll estimate based on backup intervals
+                // Start from current time and go backwards
+                var baseTime = DateTime.Now.AddMinutes(-30); // Start 30 minutes ago for first previous backup
+                
+                for (int i = 0; i < previousBackups.Count; i++)
+                {
+                    if (previousBackups[i] != null)
+                    {
+                        backupMetadataHistory.Add(new BackupMetadata 
+                        { 
+                            CreatedAt = baseTime.AddMinutes(-i * 30), // Each backup 30 minutes apart
+                            ObjectType = typeof(T).Name
+                        });
+                    }
+                    else
+                    {
+                        backupMetadataHistory.Add(new BackupMetadata 
+                        { 
+                            CreatedAt = baseTime.AddMinutes(-i * 30),
+                            ObjectType = typeof(T).Name
+                        });
+                    }
+                }
+            }
+            
+            // Start with the most recent backup (index 0)
+            currentBackupIndex = 0;
+            UpdateCurrentBackupDisplay();
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private void UpdateCurrentBackupDisplay()
+    {
+        if (backupHistory.Count > currentBackupIndex)
+        {
+            currentBackupMetadata = backupMetadataHistory.Count > currentBackupIndex ? 
+                backupMetadataHistory[currentBackupIndex] : null;
+        }
+        else
+        {
+            currentBackupMetadata = null;
+        }
+        StateHasChanged();
+    }
+
+    private RenderFragment RenderBackupProperties(T backup) => __builder =>
+    {
+        var properties = typeof(T).GetProperties()
+            .Where(p => p.CanRead && p.GetValue(backup) != null)
+            .Where(p => !IsCollection(p.PropertyType))
+            .Where(p => !typeof(IDto).IsAssignableFrom(p.PropertyType))
+            .Where(p => !typeof(IAuditDto).IsAssignableFrom(p.PropertyType))
+            .OrderBy(p => p.Name);
+
+        <MudStack Spacing="2">
+            @foreach (var property in properties)
+            {
+                var value = property.GetValue(backup);
+                if (value != null)
+                {
+                    <MudStack Row="true" AlignItems="AlignItems.Baseline" Spacing="2">
+                        <MudText Typo="Typo.body2" Style="font-weight: bold; min-width: 120px;">
+                            @FormatPropertyName(property.Name):
+                        </MudText>
+                        <MudText Typo="Typo.body2" Style="word-break: break-word; flex: 1;">
+                            @FormatPropertyValue(value)
+                        </MudText>
+                    </MudStack>
+                }
+            }
+        </MudStack>
+    };
+
+    private string FormatPropertyName(string propertyName)
+    {
+        // Convert PascalCase to spaced format
+        return System.Text.RegularExpressions.Regex.Replace(propertyName, 
+            "([a-z])([A-Z])", "$1 $2");
+    }
+
+    private bool IsCollection(Type type)
+    {
+        // Check if it's a collection type (but not string)
+        if (type == typeof(string))
+            return false;
+            
+        return typeof(System.Collections.IEnumerable).IsAssignableFrom(type);
+    }
+
+    private string FormatPropertyValue(object value)
+    {
+        return value switch
+        {
+            DateTime dt => dt.ToString("yyyy-MM-dd HH:mm:ss"),
+            DateTimeOffset dto => dto.ToString("yyyy-MM-dd HH:mm:ss"),
+            Guid guid => guid.ToString(),
+            decimal dec => dec.ToString("F2"),
+            double dbl => dbl.ToString("F2"),
+            float flt => flt.ToString("F2"),
+            bool boolean => boolean ? "Yes" : "No",
+            _ => value.ToString() ?? "N/A"
+        };
+    }
+
+    private void PreviousBackup()
+    {
+        if (currentBackupIndex < backupHistory.Count - 1)
+        {
+            currentBackupIndex++;
+            UpdateCurrentBackupDisplay();
+        }
+    }
+
+    private void NextBackup()
+    {
+        if (currentBackupIndex > 0)
+        {
+            currentBackupIndex--;
+            UpdateCurrentBackupDisplay();
+        }
+    }
+
+    private async Task RestoreSelectedBackup()
+    {
+        try
+        {
+            if (backupHistory.Count > currentBackupIndex && backupHistory[currentBackupIndex] != null)
+            {
+                var selectedBackup = backupHistory[currentBackupIndex]!;
+                
+                // Copy properties from backup to current model
+                // Using reflection to copy all properties
+                var backupType = typeof(T);
+                var modelProperties = backupType.GetProperties();
+                
+                foreach (var property in modelProperties)
+                {
+                    if (property.CanWrite)
+                    {
+                        var value = property.GetValue(selectedBackup);
+                        property.SetValue(Model, value);
+                    }
+                }
+                
+                await CloseDialog();
+                
+                // Trigger the restored event
+                await OnBackupRestored.InvokeAsync(selectedBackup);
+            }
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private async Task CloseDialog()
+    {
+        _internalVisible = false;
+        _wasVisible = false;
+        
+        backupHistory.Clear();
+        backupMetadataHistory.Clear();
+        currentBackupIndex = 0;
+        currentBackupMetadata = null;
+
+        await IsVisibleChanged.InvokeAsync(false);
+    }
+}

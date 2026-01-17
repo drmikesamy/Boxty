@@ -1,0 +1,97 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.ClientBase.Enums
+@using MudBlazor
+@using System.Threading
+@using Boxty.ClientBase.Services
+@using Boxty.SharedBase.DTOs
+@using Boxty.SharedBase.Interfaces
+@using System.Linq.Expressions
+@typeparam TDto where TDto : IDto, ILazyLookup
+@inject ILazyLookupService<TDto> LookupService
+
+@switch (FieldType)
+{
+    case LazyLookupEnum.Text:
+        <span>@(_items?.FirstOrDefault(i => i.Id == ItemId)?.DisplayName ?? "(Not set)")</span>
+        break;
+    case LazyLookupEnum.ReadOnly:
+        <MudField Variant="Variant.Outlined" Label="@Label" For="@For">@(_items?.FirstOrDefault(i => i.Id == ItemId)?.DisplayName ?? "(Not set)")</MudField>
+        break;
+    case LazyLookupEnum.Search:
+        <MudAutocomplete T=Guid Value="ItemId" ValueChanged="TriggerUpdateCallback" SearchFunc="Search" ToStringFunc="ToStringFunc" Variant="Variant.Outlined" Label="@Label"
+            Disabled="@Disabled" ReadOnly="@ReadOnly"
+            Placeholder="@Placeholder" For="@For" Clearable="true" />
+        break;
+    default:
+        <MudText>(Not set)</MudText>
+        break;
+}
+
+@code {
+    [Parameter] public LazyLookupEnum FieldType { get; set; } = LazyLookupEnum.Search;
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public bool ReadOnly { get; set; } = false;
+    [Parameter] public bool Disabled { get; set; } = false;
+    [Parameter] public string Placeholder { get; set; } = "Not selected";
+    [Parameter] public Guid ItemId { get; set; } = default!;
+    [Parameter] public EventCallback<Guid> ItemIdChanged { get; set; } = default!;
+    [Parameter] public EventCallback<TDto> ItemChanged { get; set; } = default!;
+    [Parameter] public Guid? TenantConstraint { get; set; } = default!;
+    [Parameter] public Guid? SubjectConstraint { get; set; } = default!;
+    [Parameter] public Expression<Func<Guid>>? For { get; set; }
+    private List<TDto> _items { get; set; } = new();
+    private Guid? _previousTenantConstraint = null;
+    private Guid? _previousSubjectConstraint = null;
+    
+    protected override async Task OnInitializedAsync(){
+        await LoadItems();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Reload items if the TenantConstraint or SubjectConstraint has changed
+        if (_previousTenantConstraint != TenantConstraint || _previousSubjectConstraint != SubjectConstraint)
+        {
+            await LoadItems();
+        }
+    }
+
+    private async Task LoadItems()
+    {
+        _items = (await LookupService.GetAllItems(CancellationToken.None, TenantConstraint, SubjectConstraint)).ToList();
+        _previousTenantConstraint = TenantConstraint;
+        _previousSubjectConstraint = SubjectConstraint;
+
+        if (typeof(IDefaultable).IsAssignableFrom(typeof(TDto)) && ItemId == Guid.Empty)
+        {
+            var defaultItem = _items.FirstOrDefault(i => ((IDefaultable)i).IsDefault);
+            if (defaultItem != null)
+            {
+                ItemId = defaultItem.Id;
+                TriggerUpdateCallback(ItemId);
+            }
+        }
+        
+        StateHasChanged();
+    }
+    
+    private void TriggerUpdateCallback(Guid guid)
+    {
+        ItemChanged.InvokeAsync(_items.FirstOrDefault(x => x.Id == guid));
+        ItemIdChanged.InvokeAsync(guid);
+        StateHasChanged();
+    }
+    private Task<IEnumerable<Guid>> Search(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return Task.FromResult(_items.Select(i => i.Id));
+        }
+        return Task.FromResult(_items.Where(x => x.DisplayName.Contains(value, StringComparison.InvariantCultureIgnoreCase)).Select(i => i.Id));
+    }
+
+    private string ToStringFunc(Guid guid)
+    {
+        return _items.FirstOrDefault(x => x.Id == guid)?.DisplayName ?? string.Empty;
+    }
+}

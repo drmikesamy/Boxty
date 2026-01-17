@@ -1,0 +1,427 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.ClientBase.Services
+@using Boxty.SharedBase.DTOs
+@using Boxty.SharedBase.Interfaces
+@using FluentValidation
+@using MudBlazor
+@using System.Linq.Expressions
+@using System.Reflection
+@typeparam TValidator where TValidator : IValidator, new()
+@inject IAuthHelperService AuthHelper
+@inject IDialogService DialogService
+@inject ILazyLookupService<TDto> LookupService
+@inject IDocumentUploadService DocumentUploadService
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@typeparam TDto where TDto : IAuditDto, IDocumentDto, ILazyLookup
+@implements IAsyncDisposable
+
+<MudPaper Class="pa-4">
+    @if (!CompactMode)
+    {
+        <MudStack Row="true" Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-2">
+            <MudText Typo="Typo.h1">Documents</MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ShowDocumentUploadDialog"
+                StartIcon="@Icons.Material.Filled.UploadFile">Upload New Document</MudButton>
+        </MudStack>
+    }
+    else
+    {
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ShowDocumentUploadDialog"
+            StartIcon="@Icons.Material.Filled.UploadFile">Upload New Document</MudButton>
+    }
+
+    <MudDataGrid T="TDto" Items="_documents" Dense="true" Hover="true" Striped="true" Bordered="true"
+        Filterable="!CompactMode">
+        <Columns>
+            <PropertyColumn Property="x => x.Name" />
+            <PropertyColumn Property="x => x.Description" />
+            <PropertyColumn Property="x => x.CreatedBy" Title="Created By" />
+            <PropertyColumn Property="x => x.CreatedDate" Title="Created Date" />
+            <TemplateColumn CellClass="d-flex justify-end">
+                <HeaderTemplate>
+                    <MudText Typo="Typo.subtitle2">Actions</MudText>
+                </HeaderTemplate>
+                <CellTemplate>
+                    <MudButtonGroup Color="Color.Primary" Variant="Variant.Filled" Size="Size.Small">
+                        <MudIconButton Icon="@Icons.Material.Filled.Visibility" 
+                                       OnClick="() => OnDocumentSelected(context.Item)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" 
+                                       OnClick="() => ShowEditDocumentDialog(context.Item)" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" 
+                                       OnClick="() => ShowDeleteConfirmation(context.Item)" />
+                    </MudButtonGroup>
+                </CellTemplate>
+            </TemplateColumn>
+        </Columns>
+        <NoRecordsContent>
+            <MudText>No documents found.</MudText>
+        </NoRecordsContent>
+    </MudDataGrid>
+</MudPaper>
+
+<MudDialog @bind-Visible="@_documentViewerOpen" Options="_documentViewerOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Document Viewer</MudText>
+    </TitleContent>
+    <DialogContent>
+        @if (!string.IsNullOrEmpty(documentUrl))
+        {
+            <div style="width: 100%; height: 80vh;">
+                <iframe src="@documentUrl" 
+                        width="100%" 
+                        height="100%" 
+                        style="border: none; border-radius: 4px;"
+                        title="Document Viewer">
+                </iframe>
+            </div>
+        }
+        else
+        {
+            <MudAlert Severity="MudBlazor.Severity.Info">Select a document to view</MudAlert>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="() => _documentViewerOpen = false">Close</MudButton>
+        <MudButton OnClick="OpenInNewTab" Color="Color.Primary" Disabled="string.IsNullOrEmpty(documentUrl)">
+            Open in New Tab
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_uploadDocumentDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Upload New Document</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudForm @ref="form" Model="_newDocument" Validation="validator" ValidationDelay="0">
+        <MudTextField @bind-Value="_newDocument.Name" Label="Document Name" Variant="Variant.Outlined" For="@(() => _newDocument.Name)" Immediate="true" />
+        <MudTextField @bind-Value="_newDocument.Description" Label="Description" Variant="Variant.Outlined" For="@(() => _newDocument.Description)" Immediate="true" Lines="3" AutoGrow Class="mt-3" />
+        <MudFileUpload T="IBrowserFile" FilesChanged="HandleFileSelected">
+            <ActivatorContent>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary">
+                    Select File
+                </MudButton>
+            </ActivatorContent>
+            <SelectedTemplate>
+                @if (_fileToUpload != null)
+                {
+                    <MudText>@_fileToUpload.Name</MudText>
+                }
+                else
+                {
+                    <MudText>No File</MudText>
+                }
+            </SelectedTemplate>
+        </MudFileUpload>
+        </MudForm>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="UploadDocument" Disabled="_fileToUpload == null">Upload
+        </MudButton>
+        <MudButton OnClick="() => _uploadDocumentDialogOpen = false">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_editDocumentDialogOpen" Options="_dialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Edit Document Details</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudTextField @bind-Value="_editingDocument.Name" Label="Document Name" Variant="Variant.Outlined" />
+        <MudTextField @bind-Value="_editingDocument.Description" Label="Description" Variant="Variant.Outlined" Lines="3" AutoGrow
+            Class="mt-3" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="SaveDocumentChanges">Save Changes</MudButton>
+        <MudButton OnClick="() => _editDocumentDialogOpen = false">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<MudDialog @bind-Visible="_deleteConfirmationOpen" Options="_deleteDialogOptions">
+    <TitleContent>
+        <MudText Typo="Typo.h6">Confirm Delete</MudText>
+    </TitleContent>
+    <DialogContent>
+        <MudText>Are you sure you want to delete the document "@(_documentToDelete?.Name)"?</MudText>
+        <MudText Class="mt-2" Typo="Typo.body2" Color="Color.Warning">This action cannot be undone.</MudText>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Error" OnClick="DeleteDocument">Delete</MudButton>
+        <MudButton OnClick="() => _deleteConfirmationOpen = false">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [Parameter] public bool CompactMode { get; set; } = false;
+    [Parameter] public Guid SubjectId { get; set; } = Guid.Empty;
+    [Parameter] public Guid TenantId { get; set; } = Guid.Empty;
+    private MudForm form = default!;
+    private TValidator validator = Activator.CreateInstance<TValidator>();
+    private TDto _newDocument { get; set; } = Activator.CreateInstance<TDto>();
+    private TDto _editingDocument { get; set; } = Activator.CreateInstance<TDto>();
+    private TDto? _documentToDelete { get; set; }
+    private List<TDto> _documents { get; set; } = new();
+    private bool _uploadDocumentDialogOpen = false;
+    private bool _editDocumentDialogOpen = false;
+    private bool _deleteConfirmationOpen = false;
+    private IBrowserFile? _fileToUpload;
+    private DialogOptions _dialogOptions = new() { MaxWidth = MaxWidth.Small, FullWidth = true };
+    private DialogOptions _deleteDialogOptions = new() { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true };
+    private DialogOptions _documentViewerOptions = new() { FullScreen = true };
+    private bool _documentViewerOpen = false;
+    private string documentUrl = "";
+    
+    private Guid _previousSubjectId = Guid.Empty;
+    private Guid _previousTenantId = Guid.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDocuments();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // Only reload if constraint parameters actually changed
+        if (SubjectId != _previousSubjectId || TenantId != _previousTenantId)
+        {
+            await LoadDocuments();
+            _previousSubjectId = SubjectId;
+            _previousTenantId = TenantId;
+        }
+    }
+
+    private async Task LoadDocuments()
+    {
+        try
+        {
+            if (SubjectId != Guid.Empty || TenantId != Guid.Empty)
+            {
+                var tenantConstraint = TenantId != Guid.Empty ? TenantId : (Guid?)null;
+                var subjectConstraint = SubjectId != Guid.Empty ? SubjectId : (Guid?)null;
+                
+                _documents = (await LookupService.GetAllItems(
+                    CancellationToken.None, 
+                    tenantConstraint, 
+                    subjectConstraint)).ToList();
+            }
+            else
+            {
+                _documents.Clear();
+            }
+            
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            _documents.Clear();
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SetupBackButtonHandler();
+        }
+    }
+
+    private async Task SetupBackButtonHandler()
+    {
+        var jsCode = @"
+            window.documentBrowserBackHandler = function(dotNetRef) {
+                let handlePopState = function(e) {
+                    dotNetRef.invokeMethodAsync('HandleBackButton').then(function(handled) {
+                        if (handled) {
+                            history.pushState(null, null, location.href);
+                        }
+                    });
+                };
+                
+                if (window.currentDocBrowserPopHandler) {
+                    window.removeEventListener('popstate', window.currentDocBrowserPopHandler);
+                }
+                
+                window.currentDocBrowserPopHandler = handlePopState;
+                window.addEventListener('popstate', handlePopState);
+                history.pushState(null, null, location.href);
+            };
+        ";
+        
+        await JSRuntime.InvokeVoidAsync("eval", jsCode);
+        await JSRuntime.InvokeVoidAsync("documentBrowserBackHandler", DotNetObjectReference.Create(this));
+    }
+
+    [JSInvokable]
+    public async Task<bool> HandleBackButton()
+    {
+        if (_documentViewerOpen)
+        {
+            _documentViewerOpen = false;
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+        
+        if (_uploadDocumentDialogOpen)
+        {
+            _uploadDocumentDialogOpen = false;
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+        
+        if (_editDocumentDialogOpen)
+        {
+            _editDocumentDialogOpen = false;
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+        
+        if (_deleteConfirmationOpen)
+        {
+            _deleteConfirmationOpen = false;
+            await InvokeAsync(StateHasChanged);
+            return true;
+        }
+        
+        return false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                if (window.currentDocBrowserPopHandler) {
+                    window.removeEventListener('popstate', window.currentDocBrowserPopHandler);
+                    window.currentDocBrowserPopHandler = null;
+                }
+            ");
+        }
+        catch
+        {
+            // Ignore errors during disposal
+        }
+    }
+
+    private void ShowDocumentUploadDialog()
+    {
+        _newDocument = Activator.CreateInstance<TDto>();
+        _uploadDocumentDialogOpen = true;
+        _fileToUpload = null;
+    }
+
+    private void HandleFileSelected(IBrowserFile file)
+    {
+        _fileToUpload = file;
+    }
+
+    private async Task UploadDocument()
+    {
+        if (_fileToUpload == null || string.IsNullOrWhiteSpace(_fileToUpload.Name))
+            return;
+
+        try
+        {
+            var newDto = Activator.CreateInstance<TDto>();
+            newDto.Name = _newDocument.Name;
+            newDto.Description = _newDocument.Description;
+            newDto.TenantId = TenantId;
+            newDto.SubjectId = SubjectId;
+            
+            // Check if TDto has SubjectId property and set it if available
+            var subjectIdProperty = typeof(TDto).GetProperty("SubjectId");
+            if (subjectIdProperty != null && subjectIdProperty.CanWrite)
+            {
+                subjectIdProperty.SetValue(newDto, SubjectId);
+            }
+
+            await DocumentUploadService.UploadDocument<TDto>(
+                new Tuple<IDocumentDto, IBrowserFile>(newDto, _fileToUpload),
+                CancellationToken.None);
+
+            // Reload documents to show the new upload
+            await LoadDocuments();
+            
+            _uploadDocumentDialogOpen = false;
+            _fileToUpload = null;
+        }
+        catch (Exception)
+        {
+        }
+    }
+
+    private async Task OnDocumentSelected(TDto document)
+    {
+        documentUrl = (await DocumentUploadService.GetSasLink<TDto>(((IDocumentDto)document).Id, CancellationToken.None)) ?? "";
+        _documentViewerOpen = true;
+        StateHasChanged();
+    }
+
+    private async Task OpenInNewTab()
+    {
+        if (!string.IsNullOrEmpty(documentUrl))
+        {
+            await JSRuntime.InvokeVoidAsync("open", documentUrl, "_blank");
+        }
+    }
+
+    private void ShowEditDocumentDialog(TDto document)
+    {
+        _editingDocument = (TDto)Activator.CreateInstance(typeof(TDto))!;
+        _editingDocument.Id = document.Id;
+        _editingDocument.Name = document.Name;
+        _editingDocument.Description = document.Description;
+        _editingDocument.TenantId = document.TenantId;
+        _editingDocument.SubjectId = document.SubjectId;
+        // Copy other properties as needed
+        _editDocumentDialogOpen = true;
+    }
+
+    private void ShowDeleteConfirmation(TDto document)
+    {
+        _documentToDelete = document;
+        _deleteConfirmationOpen = true;
+    }
+
+    private async Task SaveDocumentChanges()
+    {
+        if (_editingDocument != null)
+        {
+            try
+            {
+                // Update the document details through the lookup service
+                await LookupService.UpdateItem(_editingDocument, CancellationToken.None);
+                
+                // Reload documents to reflect the changes
+                await LoadDocuments();
+                
+                _editDocumentDialogOpen = false;
+            }
+            catch (Exception)
+            {
+            }
+        }
+    }
+
+    private async Task DeleteDocument()
+    {
+        if (_documentToDelete != null)
+        {
+            try
+            {
+                // Delete from database using LookupService
+                await LookupService.DeleteItem(_documentToDelete.Id, CancellationToken.None);
+                
+                // Reload documents to reflect the deletion
+                await LoadDocuments();
+                
+                _deleteConfirmationOpen = false;
+                _documentToDelete = default(TDto);
+            }
+            catch (Exception)
+            {
+            }
+        }
+    }
+}

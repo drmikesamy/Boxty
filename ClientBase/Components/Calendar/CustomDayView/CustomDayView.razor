@@ -1,0 +1,109 @@
+@namespace Boxty.ClientBase.Components.Calendar.CustomDayView
+@using Boxty.SharedBase.Models
+@using Heron.MudCalendar
+@inherits DayView<TCalendarItem>
+@typeparam TCalendarItem where TCalendarItem : BaseCalendarItem
+
+@Render
+
+@code {
+    private const int MinutesInDay = 24 * 60;
+    private int CellsInDay => MinutesInDay / (int)Calendar.DayTimeInterval;
+    protected override int DaysInView => 1;
+
+    private bool IsHourCell(int row)
+    {
+        return (int)Calendar.DayTimeInterval >= 60 || row % (60 / (int)Calendar.DayTimeInterval) == 0;
+    }
+
+    /// <summary>
+    /// Renders the header that contains the day names.
+    /// </summary>
+    protected override RenderFragment RenderHeader =>
+    @<div>
+    <div class="@HeaderClass">
+        <div></div>
+        @foreach (var cell in Cells)
+        {
+        <div class="vertical-abbreviated-date-title">
+            <div aria-label="@($"{cell.Date:dddd} {cell.Date.Day}")">
+                @RenderDayTitle(cell)
+            </div>
+            <div aria-label="@($"{cell.Date:dddd} {cell.Date.Day}")">
+                <p>@cell.Date.Day</p>
+            </div>
+        </div>
+        }
+        </div>
+    </div>;
+
+/// <summary>
+/// Renders the title of a day.
+/// </summary>
+protected override RenderFragment RenderDayTitle(CalendarCell<TCalendarItem> cell) => __builder =>
+{
+    __builder.AddContent(1, cell.Date.ToString("ddd")[0]);
+};
+
+    /// <summary>
+    /// Renders the day/week structure.
+    /// </summary>
+    protected override RenderFragment RenderTimes =>
+        @<div class="d-block relative">
+            <div class="@GridClass">
+                @for (var row = 0; row < CellsInDay; row++)
+                {
+                    <div class="@TimeCellClassname(row)" style="@CellHeightStyle()">
+                        @if (IsHourCell(row))
+                        {
+                            @DrawTime(row)
+                        }
+                    </div>
+                    @foreach (var cell in Cells)
+                    {
+                        <div class="@DayCellClassname(cell, row)" style="@DayStyle(cell, row)">
+                            @if (Calendar.ShowCurrentTime && TimelineRow() == row)
+                            {
+                                <hr class="mud-cal-current-time" style="@TimelineStyle()"/>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+        </div>;
+
+/// <summary>
+/// Renders the cells.
+/// </summary>
+protected override RenderFragment RenderCells =>
+@<div class="mud-cal-week-layer">
+    <div></div>
+    <div class="@GridClass">
+        @foreach (var cell in Cells)
+        {
+            @RenderCell(cell)
+        }
+    </div>
+</div>;
+
+/// <summary>
+/// Renders an individual cell.
+/// </summary>
+protected override RenderFragment RenderCell(CalendarCell<TCalendarItem> cell) =>
+@<div class="mud-cal-week-cell-holder">
+@for (var i = 0; i < CellsInDay; i++)
+{
+    var row = i;
+        <MudDropZone T="WeekView<TCalendarItem>" OnlyZone="true" Style="@CellHeightStyle()"
+            Identifier="@string.Concat(cell.Date.Date.ToString("d"), "_", row.ToString())">
+            @if (Calendar.CellClicked.HasDelegate)
+            {
+                <MudLink @onclick="() => OnCellLinkClicked(cell, row)" Class="mud-cal-week-cell-link">
+                    <div class="mud-cal-week-link"></div>
+                </MudLink>
+            }
+        </MudDropZone>
+}
+@RenderCellContents(cell)
+</div>;
+}

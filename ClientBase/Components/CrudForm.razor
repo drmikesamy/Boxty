@@ -1,0 +1,316 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.ClientBase.Components
+@using Boxty.ClientBase.Enums
+@using Boxty.ClientBase.Extensions
+@using Boxty.ClientBase.Services
+@using Boxty.SharedBase.Interfaces
+@using FluentValidation
+@using FluentValidation.Results
+@using MudBlazor
+@using Boxty.SharedBase.Enums
+@inject IDialogService DialogService
+@inject IValidator<T> Validator
+@inject ILazyLookupService<T> LookupService
+@inject ILocalBackupService LocalBackupService
+@inject ISnackbar Snackbar
+@typeparam T where T : class, IDto, IAuditDto, ILazyLookup
+
+<CascadingValue Name="Model" Value="@Model" IsFixed="false">
+    <CascadingValue Name="FormMode" Value="@FormMode" IsFixed="false">
+        <CascadingValue Name="FormObject" Value="@form" IsFixed="false">
+            <MudContainer>
+                <MudForm @ref="form" Model="Model" Validation="@GetValidationFunction()"
+                    ReadOnly="@(Model is IDraftable draftable && !draftable.IsDraft)" ValidationDelay="0">
+                    @ChildContent
+                </MudForm>
+                @if (FormMode != FormModeEnum.View){
+                    <MudStack Row="true" Justify="Justify.FlexEnd">
+                        @CustomButtons
+                        @if (Model is IDraftable draftable)
+                        {
+                            @if (draftable.IsDraft)
+                            {
+                                @if (CanFinalise)
+                                {
+                                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(async () => await SaveItem(true))">
+                                        Finalise & Submit
+                                    </MudButton>
+                                }
+                                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(async () => await SaveItem())">
+                                    Save
+                                </MudButton>
+                            }
+                            else
+                            {
+                                <MudAlert Severity="MudBlazor.Severity.Info" Class="mt-2">
+                                    This item has been finalised and cannot be edited further.
+                                </MudAlert>
+                            }
+                        }
+                        else
+                        {
+                            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="@(async () => await SaveItem())">
+                                Save
+                            </MudButton>
+                        }
+                        @if (FormMode == FormModeEnum.Edit)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Error" OnClick="@(async () => await DeleteItem())">
+                                Delete
+                            </MudButton>
+                        }
+                        @if (IsModal)
+                        {
+                            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="@(() => OnCancel.InvokeAsync())">
+                                Cancel
+                            </MudButton>
+                        }
+                    </MudStack>
+                    <MudText Typo="Typo.caption" Style="italic">Last saved: @lastSaveDisplay | Last local backup:
+                        @lastBackupDisplay (<MudLink Typo="Typo.caption" OnClick="@OpenBackupDialog">review backups</MudLink>)
+                    </MudText>
+                }
+                
+            </MudContainer>
+        </CascadingValue>
+    </CascadingValue>
+</CascadingValue>
+
+<!-- Backup History Dialog Component -->
+<BackupHistoryDialog T="T" @bind-IsVisible="showBackupDialog" Model="Model" OnBackupRestored="OnBackupRestored" />
+
+@code {
+    public string Title => typeof(T).Name.Replace("Dto", string.Empty);
+    [Parameter] public bool IsModal { get; set; } = true;
+    [Parameter] public RenderFragment ChildContent { get; set; } = default!;
+    [Parameter] public RenderFragment CustomButtons { get; set; } = default!;
+    private MudForm form = default!;
+    [Parameter] public T Model { get; set; } = default!;
+    [Parameter] public FormModeEnum FormMode { get; set; } = FormModeEnum.Create;
+    [CascadingParameter(Name = "Tenant")] public ITenant Tenant { get; set; } = default!;
+    [CascadingParameter(Name = "Subject")] public ISubject Subject { get; set; } = default!;
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback<T> OnAdd { get; set; }
+    [Parameter] public EventCallback<T> OnUpdate { get; set; }
+    [Parameter] public EventCallback<T> OnDelete { get; set; }
+    [Parameter] public EventCallback<T> OnBeforeSave { get; set; }
+    [Parameter] public EventCallback<T> OnAfterSave { get; set; }
+    [Parameter] public bool CanFinalise { get; set; } = false;
+    private System.Timers.Timer? _backupTimer;
+    private string lastSaveDisplay = "Never saved";
+    private string lastBackupDisplay = "Loading...";
+
+    // Backup dialog field
+    private bool showBackupDialog = false;
+
+    private Func<object, string, Task<IEnumerable<string>>> GetValidationFunction()
+    {
+        return async (model, propertyName) =>
+        {
+            var validationModes = new List<string> { "Default" };
+            
+            Console.WriteLine($"CrudForm: Validating {propertyName} in {string.Join(", ", validationModes)} mode.");
+            if (model is IDraftable draftable && !draftable.IsDraft)
+            {
+                Console.WriteLine("CrudForm: Using finalise mode validation.");
+                if (!validationModes.Contains("Finalise"))
+                    validationModes.Add("Finalise");
+            }
+
+            return await ((IValidateValue)Validator).ValidateValue(model, propertyName, validationModes);
+        };
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Initialize the backup service
+        await LocalBackupService.InitializeAsync();
+
+        // Load the last backup time
+        await UpdateLastBackupDisplay();
+
+        // Set up auto-backup timer
+        _backupTimer = new System.Timers.Timer(30000);
+        _backupTimer.Elapsed += OnBackupTimerElapsed;
+        _backupTimer.Start();
+    }
+
+    protected override void OnParametersSet()
+    {
+        base.OnParametersSet();
+
+        if (Model != null)
+        {
+            if (Tenant != null && Model.TenantId == Guid.Empty)
+            {
+                Model.TenantId = Tenant.Id;
+            }
+            
+            if (Subject != null && Model.SubjectId == Guid.Empty)
+            {
+                Model.SubjectId = Subject.Id;
+            }
+        }
+    }
+
+    private async Task UpdateLastBackupDisplay()
+    {
+        try
+        {
+            var backupKey = $"{typeof(T).Name}_{Model.Id}";
+            var lastBackupTime = await LocalBackupService.GetLastBackupTime(backupKey);
+            lastBackupDisplay = lastBackupTime.ToLocalDisplayString(emptyText: "Never backed up");
+            lastSaveDisplay = Model.ModifiedDate.ToLocalDisplayString(emptyText: "Never saved");
+            StateHasChanged();
+        }
+        catch (Exception)
+        {
+            lastBackupDisplay = "Error loading backup info";
+        }
+    }
+
+    private void OnBackupTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
+    {
+        // Fire and forget the backup operation
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var backupKey = $"{typeof(T).Name}_{Model.Id}";
+                await LocalBackupService.BackupSilentAsync(backupKey, Model);
+
+                // Update the display after successful backup
+                await InvokeAsync(async () => await UpdateLastBackupDisplay());
+            }
+            catch (Exception)
+            {
+
+            }
+        });
+    }
+
+    private async Task SaveItem(bool submit = false)
+    {    
+        ValidationResult fullValidation;
+        if (submit && Model is IDraftable draftable)
+        {
+            draftable.IsDraft = false;
+            StateHasChanged();
+            fullValidation = await Validator.ValidateAsync(Model, options => options.IncludeRuleSets("Finalise"));
+            await form.Validate();
+            
+            if (form.IsValid != true || !fullValidation.IsValid)
+            {
+                if (!fullValidation.IsValid && fullValidation.Errors.Any())
+                {
+                    var errorMessage = "Validation failed:\n" + string.Join("\n", fullValidation.Errors.Select(e => $"• {e.ErrorMessage}"));
+                    Snackbar.Add(errorMessage, MudBlazor.Severity.Error);
+                }
+                else
+                {
+                    Snackbar.Add("Form is not valid. Please fill in all fields correctly.", MudBlazor.Severity.Error);
+                }
+                draftable.IsDraft = true;
+                return;
+            }
+
+            var result = await DialogService.ShowMessageBox(
+                $"Finalise {Title}",
+                $"Are you sure you want to finalise {Title}? Form, or attached forms, cannot be futher edited by any user after finalising.",
+                yesText: "Yes", cancelText: "Cancel");
+
+            if (result != true)
+            {
+                draftable.IsDraft = true;
+                return;
+            }
+        }
+        else
+        {
+            fullValidation = await Validator.ValidateAsync(Model);
+            await form.Validate();
+        }
+
+        if (form.IsValid == true && fullValidation.IsValid)
+        {
+            if (OnBeforeSave.HasDelegate)
+            {
+                await OnBeforeSave.InvokeAsync(Model);
+            }
+            try
+            {
+                if (FormMode == FormModeEnum.Edit || Model.CreatedDate > DateTime.MinValue)
+                {
+                    await LookupService.UpdateItem(Model, CancellationToken.None);
+                    await OnUpdate.InvokeAsync(Model);
+                    await OnAfterSave.InvokeAsync(Model);
+                }
+                else
+                {
+                    if (Model.TenantId == Guid.Empty)
+                    {
+                        Model.TenantId = Tenant?.Id ?? Guid.Empty;
+                    }
+                    if (Model.SubjectId == Guid.Empty)
+                    {
+                        Model.SubjectId = Subject?.Id ?? Guid.Empty;
+                    }
+                    Model.Id = await LookupService.AddItem(Model, CancellationToken.None);
+                    await OnAdd.InvokeAsync(Model);
+                    await OnAfterSave.InvokeAsync(Model);
+                }
+
+                var refreshedModel = await LookupService.GetItemById(Model.Id, CancellationToken.None);
+                if (refreshedModel != null)
+                {
+                    Model = refreshedModel;
+                    lastSaveDisplay = DateTime.UtcNow.ToLocalDisplayString(emptyText: "Never saved");
+                }
+            }
+            catch
+            {
+                if (Model is IDraftable draftable2)
+                {
+                    draftable2.IsDraft = true;
+                }
+            }
+            finally
+            {
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            if (!fullValidation.IsValid && fullValidation.Errors.Any())
+            {
+                var errorMessage = "Validation failed:\n" + string.Join("\n", fullValidation.Errors.Select(e => $"• {e.ErrorMessage}"));
+                Snackbar.Add(errorMessage, MudBlazor.Severity.Error);
+            }
+            else
+            {
+                Snackbar.Add("Form is not valid. Please fill in all fields correctly.", MudBlazor.Severity.Error);
+            }
+            if (Model is IDraftable draftable2)
+            {
+                draftable2.IsDraft = true;
+            }
+        }
+    }
+
+    private async Task DeleteItem()
+    {
+        await LookupService.DeleteItem(Model.Id, CancellationToken.None);
+        await OnDelete.InvokeAsync(Model);
+    }
+
+    private void OpenBackupDialog()
+    {
+        showBackupDialog = true;
+    }
+
+    private void OnBackupRestored(T restoredModel)
+    {
+        StateHasChanged();
+    }
+}

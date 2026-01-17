@@ -1,0 +1,41 @@
+@namespace Boxty.ClientBase.Components
+
+@using FluentValidation
+@using Boxty.SharedBase.Enums
+@using Boxty.SharedBase.Interfaces
+@using Boxty.SharedBase.DTOs
+@typeparam T where T : class, new()
+
+@inject IValidator<T> Validator
+
+<MudForm Model="@Model" @ref="@form" Validation="@GetSubFormValidationFunction()">
+    @ChildContent
+</MudForm>
+
+@code {
+    [Parameter] public T? Model { get; set; }
+    public MudForm? form;
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+    [CascadingParameter(Name = "Model")] public object? ParentModel { get; set; }
+
+    private Func<object, string, Task<IEnumerable<string>>> GetSubFormValidationFunction()
+    {
+        return async (model, propertyName) =>
+        {
+            if (model == null || !(model is T typedModel)) return new List<string>();
+
+            var validationModes = new List<string> { "Default" };
+
+            if (ParentModel is IDraftable draftable && !draftable.IsDraft)
+            {
+                Console.WriteLine("ValidatedSubForm: Using finalise mode validation based on parent model state.");
+                if (!validationModes.Contains("Finalise"))
+                    validationModes.Add("Finalise");
+            }
+
+            Console.WriteLine($"ValidatedSubForm: Validating {propertyName} in {string.Join(", ", validationModes)} mode for type {typeof(T).Name}.");
+
+            return await ((IValidateValue)Validator).ValidateValue(model, propertyName, validationModes);
+        };
+    }
+}

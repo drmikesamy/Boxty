@@ -1,0 +1,18 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.SharedBase.Interfaces
+@using Boxty.ClientBase.Services
+@inject IAuthHelperService AuthHelperService
+@typeparam T where T : class, IDto, IAuditDto, ILazyLookup, ISubject
+
+@if (FormMode == FormModeEnum.Edit)
+{
+    <MudButton Variant="Variant.Filled" Color="Color.Warning"
+        OnClick="@(async () => await AuthHelperService.ResetSubjectPassword<T>(Model.Id, CancellationToken.None))">
+        Reset Password
+    </MudButton>
+}
+
+@code {
+    [CascadingParameter(Name = "Model")] public T Model { get; set; } = default!;
+    [CascadingParameter(Name = "FormMode")] public FormModeEnum FormMode { get; set; } = FormModeEnum.Create;
+}

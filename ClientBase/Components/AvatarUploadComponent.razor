@@ -1,0 +1,177 @@
+@namespace Boxty.ClientBase.Components
+@using Boxty.SharedBase.Interfaces
+@using Microsoft.AspNetCore.Components.Forms
+@using MudBlazor
+@inject IDocumentUploadService DocumentUploadService
+@inject ISnackbar Snackbar
+@typeparam TDocumentDto where TDocumentDto : IAuditDto, IDocumentDto, ILazyLookup
+@typeparam TDto where TDto : IDto, IAuditDto, ISubject, ILazyLookup
+
+<div class="avatar-upload-container">
+    <div class="avatar-preview">
+        @if (CurrentAvatarGuid != Guid.Empty)
+        {
+            <AvatarImage TDto="TDto" TDocumentDto="TDocumentDto"
+                         AvatarImageGuid="@CurrentAvatarGuid"
+                         Size="Size.Large" />
+        }
+        else if (!string.IsNullOrEmpty(PreviewImageUrl))
+        {
+            <MudAvatar Size="Size.Large" Class="avatar-large">
+                <MudImage Src="@PreviewImageUrl" ObjectFit="ObjectFit.Cover" />
+            </MudAvatar>
+        }
+        else
+        {
+            <MudAvatar Size="Size.Large" Class="avatar-large">
+                <MudIcon Icon="@Icons.Material.Filled.Person" />
+            </MudAvatar>
+        }
+    </div>
+
+    <div class="avatar-upload-actions">
+        <MudFileUpload T="IBrowserFile" Accept=".jpg,.jpeg,.png,.gif,.webp" OnFilesChanged="HandleFileSelection" MaximumFileCount="1">
+            <ActivatorContent>
+                <MudButton HtmlTag="label"
+                           Variant="Variant.Filled"
+                           Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.CloudUpload">
+                    Select Avatar from Computer
+                </MudButton>
+            </ActivatorContent>
+        </MudFileUpload>
+        
+        @if (SelectedFile != null)
+        {
+            <MudText Typo="Typo.body2" Class="mt-2">
+                Selected: @SelectedFile.Name (@FormatFileSize(SelectedFile.Size))
+            </MudText>
+        }
+    </div>
+</div>
+
+<style>
+    .avatar-upload-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .avatar-preview {
+        display: flex;
+        justify-content: center;
+    }
+
+    .avatar-large {
+        width: 120px !important;
+        height: 120px !important;
+        font-size: 3rem !important;
+    }
+
+    .avatar-upload-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+    }
+</style>
+
+@code {
+    [Parameter] public Guid SubjectId { get; set; }
+    [Parameter] public Guid TenantId { get; set; }
+    [Parameter] public Guid CurrentAvatarGuid { get; set; } = Guid.Empty;
+    [Parameter] public string? Description { get; set; }
+    [Parameter] public int DocumentType { get; set; } = 2;
+    [Parameter] public TDto Dto { get; set; } = default!;
+    [Parameter] public EventCallback<Guid> OnAvatarUploaded { get; set; }
+    
+    public IBrowserFile? SelectedFile { get; private set; }
+    private string? PreviewImageUrl { get; set; }
+
+    private async Task HandleFileSelection(InputFileChangeEventArgs e)
+    {
+        if (e.File == null) return;
+
+        SelectedFile = e.File;
+        
+        try
+        {
+            var buffer = new byte[e.File.Size];
+            await e.File.OpenReadStream().ReadAsync(buffer);
+            var base64String = Convert.ToBase64String(buffer);
+            PreviewImageUrl = $"data:{e.File.ContentType};base64,{base64String}";
+        }
+        catch (Exception)
+        {
+            PreviewImageUrl = null;
+        }
+
+        StateHasChanged();
+        await UploadAvatarDocument();
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        const int scale = 1024;
+        string[] orders = { "GB", "MB", "KB", "Bytes" };
+        long max = (long)Math.Pow(scale, orders.Length - 1);
+
+        foreach (string order in orders)
+        {
+            if (bytes > max)
+                return string.Format("{0:##.##} {1}", decimal.Divide(bytes, max), order);
+
+            max /= scale;
+        }
+        return "0 Bytes";
+    }
+
+    private async Task UploadAvatarDocument()
+    {
+        if (SelectedFile == null) return;
+
+        try
+        {
+            var avatarDto = Activator.CreateInstance<TDocumentDto>();
+            avatarDto.Name = "Avatar Image";
+            avatarDto.Description = $"Avatar for {Dto.FirstName} {Dto.LastName}";
+            avatarDto.TenantId = Dto.TenantId;
+            avatarDto.SubjectId = Dto.Id;
+            //avatarDto.ClinicianDocumentType = ClinicianDocumentTypeEnum.AvatarImage;
+
+            var uploadSuccess = await DocumentUploadService.UploadDocument<TDocumentDto>(
+                new Tuple<IDocumentDto, IBrowserFile>(avatarDto, SelectedFile),
+                CancellationToken.None);
+
+            if (uploadSuccess)
+            {
+                var sasUrl = await DocumentUploadService.GetSasLink<TDocumentDto>(avatarDto.Id, CancellationToken.None);
+
+                if (!string.IsNullOrEmpty(sasUrl))
+                {
+                    Dto.AvatarImageGuid = avatarDto.Id;
+                    // Remove the AvatarImage assignment since TDto doesn't have this property
+                    // You might need to handle this differently based on your DTOs
+                    
+                    // Notify parent component of the successful upload
+                    await OnAvatarUploaded.InvokeAsync(avatarDto.Id);
+                    
+                    Snackbar.Add("Avatar uploaded successfully!", Severity.Success);
+                }
+                else
+                {
+                    Snackbar.Add("Avatar uploaded but unable to retrieve image URL", Severity.Warning);
+                }
+            }
+            else
+            {
+                Snackbar.Add("Failed to upload avatar", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error uploading avatar: {ex.Message}", Severity.Error);
+        }
+    }
+}

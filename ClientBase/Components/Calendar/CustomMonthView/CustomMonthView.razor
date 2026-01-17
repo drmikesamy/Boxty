@@ -1,0 +1,27 @@
+@namespace Boxty.ClientBase.Components.Calendar.CustomMonthView
+@using Boxty.SharedBase.Models
+@using Heron.MudCalendar
+@inherits MonthView<TCalendarItem>
+@typeparam TCalendarItem where TCalendarItem : BaseCalendarItem
+
+@Render
+
+@code {
+    /// <summary>
+    /// Renders the header of the grid.
+    /// </summary>
+    protected override RenderFragment RenderHeader =>
+        @<div class="mud-cal-grid-header mud-cal-month-grid-header" style="@GridStyle">
+            @for (var i = 0; i < Columns; i++)
+            {
+                <div class="mud-cal-month-header" aria-label="@Cells[i].Date.ToString("dddd")">
+                    @RenderDayTitle(i)
+                </div>
+            }
+        </div>;
+
+    /// <summary>
+    /// Renders the day name.
+    /// </summary>
+    protected override RenderFragment RenderDayTitle(int day) => __builder => { __builder.AddContent(1, Cells[day].Date.ToString("ddd")); };
+}
