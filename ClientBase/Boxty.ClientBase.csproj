@@ -7,8 +7,8 @@
     <PackageId>Boxty.ClientBase</PackageId>
     <Version>1.0.0</Version>
     <Authors>Mike Samy</Authors>
-    <Company>Composed Health Ltd</Company>
-    <PackageTags>Composed Health;ClientBase;Blazor;Multi-tenant</PackageTags>
+    <Company>Boxty.org</Company>
+    <PackageTags>Boxty;ClientBase;Blazor;Multi-tenant</PackageTags>
     <Description>Client-side Blazor components and services for building multi-tenant applications</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/drmikesamy/Boxty</PackageProjectUrl>

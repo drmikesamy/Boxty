@@ -156,7 +156,7 @@ namespace Boxty.ServerBase.Commands
                 var senderName = _options.Email.SenderName;
 
                 // Create email content - reusing the same template as CreateSubjectCommand
-                var subject = "Composed Health Portal - Password Reset Notification";
+                var subject = "Boxty Portal - Password Reset Notification";
                 var htmlContent = $@"
                     <html>
                     <body>
@@ -166,7 +166,7 @@ namespace Boxty.ServerBase.Commands
                         <p><strong>Temporary Password:</strong> {newTemporaryPassword}</p>
                         <p><strong>Role:</strong> {dto.RoleName ?? "Subject"}</p>
                         <div style=""text-align: center; margin: 30px 0;"">
-                            <a href=""https://composedhealth.com"" style=""
+                            <a href=""https://boxty.org"" style=""
                                 display: inline-block;
                                 background-color: #007bff;
                                 color: white;
@@ -177,11 +177,11 @@ namespace Boxty.ServerBase.Commands
                                 font-size: 16px;
                                 border: none;
                                 cursor: pointer;
-                            "">Go to Composed Health</a>
+                            "">Go to Boxty</a>
                         </div>
-                        <p>Please note you will be prompted to change your password when you log in and two factor authentication is required. If you have any questions, please contact us at <a href=""mailto:admin@composedhealth.co.uk"">info@composedhealth.com</a>.</p>
+                        <p>Please note you will be prompted to change your password when you log in and two factor authentication is required. If you have any questions, please contact us at <a href=""mailto:admin@boxty.co.uk"">info@boxty.com</a>.</p>
                         <br/>
-                        <p>Kind Regards,<br/>Composed Health</p>
+                        <p>Kind Regards,<br/>Boxty</p>
                     </body>
                     </html>";
 
@@ -194,15 +194,15 @@ Email: {dto.Email}
 Temporary Password: {newTemporaryPassword}
 Role: {dto.RoleName ?? "Subject"}
 
-Please note you will be prompted to change your password when you log in and two factor authentication is required. If you have any questions, please contact us at admin@composedhealth.co.uk or alternatively call 01147004362.
+Please note you will be prompted to change your password when you log in and two factor authentication is required. If you have any questions, please contact us at admin@boxty.co.uk or alternatively call 01147004362.
 
 Kind Regards,
-Composed Health
+Boxty
 
 Telephone - 01147004362
-Email - admin@composedhealth.co.uk
+Email - admin@boxty.co.uk
 
-This is an automated email notification from the Composed Health Portal. Please do not reply to this email.";
+This is an automated email notification from the Boxty Portal. Please do not reply to this email.";
 
                 // Create the email request
                 var emailRequest = new SendEmailRequest

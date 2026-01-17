@@ -136,18 +136,18 @@ namespace Boxty.ServerBase.Commands
                 var senderEmail = _options.Email.SenderAddress;
                 var senderName = _options.Email.SenderName;
 
-                var subject = "Composed Health Account Created";
+                var subject = "Boxty Account Created";
                 var htmlContent = $@"
                     <html>
                     <body>
-                        <p>Welcome to the Composed Health Health Portal {dto.FirstName} {dto.LastName},</p>
-                        <p>Your portal account has been successfully created and can be accessed through the following link: <a href=""https://composedhealth.com"">Composed Health - Home</a></p>
+                        <p>Welcome to the Boxty Portal {dto.FirstName} {dto.LastName},</p>
+                        <p>Your portal account has been successfully created and can be accessed through the following link: <a href=""https://boxty.com"">Boxty - Home</a></p>
                         <p>Please use the following credentials to log in:</p>
                         <p><strong>Email:</strong> {dto.Email}</p>
                         <p><strong>Temporary Password:</strong> {newTemporaryPassword}</p>
                         <p><strong>Role:</strong> {dto.RoleName ?? "Subject"}</p>
                         <div style=""text-align: center; margin: 30px 0;"">
-                            <a href=""https://composedhealth.com"" style=""
+                            <a href=""https://boxty.org"" style=""
                                 display: inline-block;
                                 background-color: #007bff;
                                 color: white;
@@ -158,18 +158,18 @@ namespace Boxty.ServerBase.Commands
                                 font-size: 16px;
                                 border: none;
                                 cursor: pointer;
-                            "">Go to Composed Health</a>
+                            "">Go to Boxty</a>
                         </div>
-                        <p>Please note you will be prompted to change your password when you first log in. Your portal login requires two factor authentication, please ensure you have downloaded an authenticator app such as Microsoft Authenticator to allow you to login. If you have any questions, please contact us at <a href=""mailto:admin@composedhealth.co.uk"">info@composedhealth.com</a></p>
+                        <p>Please note you will be prompted to change your password when you first log in. Your portal login requires two factor authentication, please ensure you have downloaded an authenticator app such as Microsoft Authenticator to allow you to login. If you have any questions, please contact us at <a href=""mailto:admin@boxty.co.uk"">info@boxty.com</a></p>
                         <br/>
-                        <p>Kind Regards,<br/>Composed Health</p>
+                        <p>Kind Regards,<br/>Boxty</p>
                     </body>
                     </html>";
 
                 var plainTextContent = $@"
-Welcome to the Composed Health Portal {dto.FirstName} {dto.LastName},
+Welcome to the Boxty Portal {dto.FirstName} {dto.LastName},
 
-Your portal account has been successfully created and can be accessed through the following link: Composed Health - Home (https://composedhealth.com)
+Your portal account has been successfully created and can be accessed through the following link: Boxty - Home (https://boxty.com)
 
 Please use the following credentials to log in:
 
@@ -177,10 +177,10 @@ Email: {dto.Email}
 Temporary Password: {newTemporaryPassword}
 Role: {dto.RoleName ?? "Subject"}
 
-Please note you will be prompted to change your password when you first log in. Your portal login requires two factor authentication, please ensure you have downloaded an authenticator app such as Microsoft Authenticator to allow you to login. If you have any questions, please contact us at admin@composedhealth.co.uk or alternatively call 01147004362
+Please note you will be prompted to change your password when you first log in. Your portal login requires two factor authentication, please ensure you have downloaded an authenticator app such as Microsoft Authenticator to allow you to login. If you have any questions, please contact us at admin@boxty.co.uk or alternatively call 01147004362
 
 Kind Regards,
-Composed Health";
+Boxty";
 
                 var emailRequest = new SendEmailRequest
                 {
