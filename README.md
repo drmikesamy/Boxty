@@ -78,12 +78,12 @@ app.ConfigureServicesAndMapEndpoints(builder.Environment.IsDevelopment() || buil
 
 ```csharp
 // Add your client services
-builder.Services.AddScoped<ILazyLookupService<TenantDto>, LazyLookupService<TenantDto>>();
-builder.Services.AddScoped<ILazyLookupService<SubjectDto>, LazyLookupService<SubjectDto>>();
-builder.Services.AddScoped<ILazyLookupService<TenantDocumentDto>, LazyLookupService<TenantDocumentDto>>();
-builder.Services.AddScoped<ILazyLookupService<SubjectDocumentDto>, LazyLookupService<SubjectDocumentDto>>();
-builder.Services.AddScoped<ILazyLookupService<TenantNoteDto>, LazyLookupService<TenantNoteDto>>();
-builder.Services.AddScoped<ILazyLookupService<SubjectNoteDto>, LazyLookupService<SubjectNoteDto>>();
+builder.Services.AddScoped<ICrudService<TenantDto>, CrudService<TenantDto>>();
+builder.Services.AddScoped<ICrudService<SubjectDto>, CrudService<SubjectDto>>();
+builder.Services.AddScoped<ICrudService<TenantDocumentDto>, CrudService<TenantDocumentDto>>();
+builder.Services.AddScoped<ICrudService<SubjectDocumentDto>, CrudService<SubjectDocumentDto>>();
+builder.Services.AddScoped<ICrudService<TenantNoteDto>, CrudService<TenantNoteDto>>();
+builder.Services.AddScoped<ICrudService<SubjectNoteDto>, CrudService<SubjectNoteDto>>();
 builder.Services.AddScoped<IDocumentUploadService, DocumentUploadService>();
 builder.Services.AddScoped<IAuthHelperService, AuthHelperService>();
 builder.Services.AddScoped<ILocalBackupService, LocalBackupService>();

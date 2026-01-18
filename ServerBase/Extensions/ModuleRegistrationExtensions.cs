@@ -81,7 +81,7 @@ namespace Boxty.ServerBase.Extensions
             {
                 try
                 {
-                    var sharedAssemblyName = "ComposedHealthApp.SharedApp";
+                    var sharedAssemblyName = "Boxty.SharedApp";
                     Console.WriteLine($"shared assembly is {sharedAssemblyName}");
                     if (!string.IsNullOrEmpty(sharedAssemblyName))
                     {
@@ -123,7 +123,7 @@ namespace Boxty.ServerBase.Extensions
 
                 try
                 {
-                    var endpointAssemblyName = $"ComposedHealthApp.ServerApp.Modules.{module.GetType().Name.Replace("Module", "")}.Endpoints";
+                    var endpointAssemblyName = $"Boxty.ServerApp.Modules.{module.GetType().Name.Replace("Module", "")}.Endpoints";
                     var endpointAssembly = Assembly.Load(endpointAssemblyName);
 
                     var endpointTypes = endpointAssembly.GetTypes()
