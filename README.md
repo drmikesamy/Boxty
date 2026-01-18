@@ -1,6 +1,6 @@
 # Boxty
 
-A comprehensive .NET framework providing base components for building multi-tenant applications with Blazor and ASP.NET Core.
+A comprehensive .NET framework providing base components for building multi-tenant applications with Blazor, ASP.NET Core and Keycloak.
 
 ## Packages
 
