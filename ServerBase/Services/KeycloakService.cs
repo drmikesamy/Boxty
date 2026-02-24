@@ -30,7 +30,13 @@ namespace Boxty.ServerBase.Services
 
         // Role operations
         Task<RoleRepresentation> GetRoleByNameAsync(string roleName);
+        Task<ICollection<RoleRepresentation>> GetAllRolesAsync();
+        Task<ICollection<RoleRepresentation>> GetUserRolesAsync(string userId);
         Task PostUserRoleMappingAsync(string userId, ICollection<RoleRepresentation> roles);
+        Task DeleteUserRoleMappingAsync(string userId, ICollection<RoleRepresentation> roles);
+        Task CreateRoleAsync(RoleRepresentation role);
+        Task DeleteRoleAsync(string roleName);
+        Task UpdateUserAsync(string userId, UserRepresentation userRepresentation);
     }
 
     public class KeycloakService : IKeycloakService
@@ -115,10 +121,46 @@ namespace Boxty.ServerBase.Services
             return await rolesApi.GetRolesByRoleNameAsync(GetRealmName(), roleName.ToLowerInvariant());
         }
 
+        public async Task<ICollection<RoleRepresentation>> GetAllRolesAsync()
+        {
+            using var rolesApi = CreateRolesApi();
+            return await rolesApi.GetRolesAsync(GetRealmName());
+        }
+
+        public async Task<ICollection<RoleRepresentation>> GetUserRolesAsync(string userId)
+        {
+            using var roleMappingApi = CreateRoleMapperApi();
+            return await roleMappingApi.GetUsersRoleMappingsRealmByUserIdAsync(GetRealmName(), userId);
+        }
+
         public async Task PostUserRoleMappingAsync(string userId, ICollection<RoleRepresentation> roles)
         {
             using var roleMappingApi = CreateRoleMapperApi();
             await roleMappingApi.PostUsersRoleMappingsRealmByUserIdAsync(GetRealmName(), userId, roles.ToList());
+        }
+
+        public async Task DeleteUserRoleMappingAsync(string userId, ICollection<RoleRepresentation> roles)
+        {
+            using var roleMappingApi = CreateRoleMapperApi();
+            await roleMappingApi.DeleteUsersRoleMappingsRealmByUserIdAsync(GetRealmName(), userId, roles.ToList());
+        }
+
+        public async Task CreateRoleAsync(RoleRepresentation role)
+        {
+            using var rolesApi = CreateRolesApi();
+            await rolesApi.PostRolesAsync(GetRealmName(), role);
+        }
+
+        public async Task DeleteRoleAsync(string roleName)
+        {
+            using var rolesApi = CreateRolesApi();
+            await rolesApi.DeleteRolesByRoleNameAsync(GetRealmName(), roleName.ToLowerInvariant());
+        }
+
+        public async Task UpdateUserAsync(string userId, UserRepresentation userRepresentation)
+        {
+            using var usersApi = CreateUsersApi();
+            await usersApi.PutUsersByUserIdAsync(GetRealmName(), userId, userRepresentation);
         }
 
         // Private helper to create ClientCredentialsFlow

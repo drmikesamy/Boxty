@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  This is an EXAMPLE NuGet.Config for your DEMO project.
+  
+  Copy this file to your demo project root and rename it to "NuGet.Config"
+  Update the path to point to this Boxty/nupkgs folder.
+-->
+<configuration>
+  <packageSources>
+    <!-- Add the local Boxty packages folder -->
+    <!-- IMPORTANT: Update this path to match your actual Boxty location -->
+    <add key="Boxty-Local" value="/home/mike/Projects/Boxty/nupkgs" />
+    
+    <!-- Keep the default NuGet.org source -->
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+  </packageSources>
+  
+  <!-- Optional: Set source order (local first for faster resolution) -->
+  <packageSourceMapping>
+    <packageSource key="Boxty-Local">
+      <package pattern="Boxty.*" />
+    </packageSource>
+    <packageSource key="nuget.org">
+      <package pattern="*" />
+    </packageSource>
+  </packageSourceMapping>
+</configuration>

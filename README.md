@@ -11,6 +11,7 @@ Client-side Blazor components and services including:
 - Document upload services
 - Global state management
 - Frontend generic CRUD services
+- Reusable authenticated server-stream (`text/event-stream`) client
 
 ### Boxty.ServerBase
 Server-side infrastructure for building APIs with:
@@ -21,6 +22,7 @@ Server-side infrastructure for building APIs with:
 - Entity base classes with tenant isolation
 - JWT authentication helpers
 - Database context abstractions
+- Reusable keyed in-memory event stream abstraction for realtime push scenarios
 
 ### Boxty.SharedBase
 Shared models, DTOs, and interfaces used by both client and server:
@@ -88,7 +90,35 @@ builder.Services.AddScoped<IDocumentUploadService, DocumentUploadService>();
 builder.Services.AddScoped<IAuthHelperService, AuthHelperService>();
 builder.Services.AddScoped<ILocalBackupService, LocalBackupService>();
 builder.Services.AddScoped<GlobalStateService>();
+builder.Services.AddScoped<IServerEventStreamClient, ServerEventStreamClient>();
 ```
+
+### Realtime Streaming Pattern (Reusable)
+
+Boxty provides reusable primitives for module-level realtime updates without introducing custom auth flows:
+
+- `Boxty.ServerBase.Interfaces.IKeyedEventStream<TKey,TEvent>`
+- `Boxty.ServerBase.Services.InMemoryKeyedEventStream<TKey,TEvent>`
+- `Boxty.ClientBase.Services.IServerEventStreamClient`
+- `Boxty.ClientBase.Services.ServerEventStreamClient`
+
+Server registration example:
+
+```csharp
+services.AddSingleton<IKeyedEventStream<Guid, MyEventDto>, InMemoryKeyedEventStream<Guid, MyEventDto>>();
+```
+
+Client consumption example:
+
+```csharp
+await serverEventStreamClient.StreamAsync<MyEventDto>("api/mymodule/events/stream", async evt =>
+{
+    // Update component state from streamed event
+    await InvokeAsync(StateHasChanged);
+}, cancellationToken);
+```
+
+This pattern works with standard Keycloak/JWT auth because requests flow through the normal authenticated `HttpClient` pipeline.
 
 ## Requirements
 
