@@ -12,6 +12,7 @@
 @inject IValidator<T> Validator
 @inject ICrudService<T> LookupService
 @inject ILocalBackupService LocalBackupService
+@inject IAuthHelperService AuthHelperService
 @inject ISnackbar Snackbar
 @typeparam T where T : class, IDto, IAuditDto, IAutoCrud
 
@@ -191,7 +192,9 @@
     }
 
     private async Task SaveItem(bool submit = false)
-    {    
+    {
+        await EnsureModelContextAsync();
+
         ValidationResult fullValidation;
         if (submit && Model is IDraftable draftable)
         {
@@ -294,6 +297,46 @@
             if (Model is IDraftable draftable2)
             {
                 draftable2.IsDraft = true;
+            }
+        }
+    }
+
+    private async Task EnsureModelContextAsync()
+    {
+        if (Model == null)
+        {
+            return;
+        }
+
+        if (Model.TenantId == Guid.Empty)
+        {
+            if (Tenant != null && Tenant.Id != Guid.Empty)
+            {
+                Model.TenantId = Tenant.Id;
+            }
+            else
+            {
+                var tenantId = await AuthHelperService.GetTenantIdAsync();
+                if (tenantId.HasValue)
+                {
+                    Model.TenantId = tenantId.Value;
+                }
+            }
+        }
+
+        if (Model.SubjectId == Guid.Empty)
+        {
+            if (Subject != null && Subject.Id != Guid.Empty)
+            {
+                Model.SubjectId = Subject.Id;
+            }
+            else
+            {
+                var subjectId = await AuthHelperService.GetSubjectIdAsync();
+                if (subjectId.HasValue)
+                {
+                    Model.SubjectId = subjectId.Value;
+                }
             }
         }
     }

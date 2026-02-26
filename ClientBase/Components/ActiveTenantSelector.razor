@@ -1,0 +1,58 @@
+@using Boxty.ClientBase.Services
+@using MudBlazor
+@inject IAuthHelperService AuthHelperService
+
+@if (_loading)
+{
+    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mx-2" />
+}
+else if (_tenants.Count > 1)
+{
+    <MudSelect T="Guid?"
+               Value="_selectedTenantId"
+               ValueChanged="OnTenantChanged"
+               Label="Active Tenant"
+               Variant="Variant.Outlined"
+               Dense="true"
+               Class="mx-2"
+               Style="min-width: 220px;">
+        @foreach (var tenant in _tenants)
+        {
+            <MudSelectItem Value="@((Guid?)tenant.Id)">@tenant.Name</MudSelectItem>
+        }
+    </MudSelect>
+}
+else if (_tenants.Count == 1)
+{
+    <MudChip T="string" Class="mx-2" Color="Color.Primary" Variant="Variant.Outlined">
+        @_tenants[0].Name
+    </MudChip>
+}
+
+@code {
+    private readonly List<TenantSelectionDto> _tenants = new();
+    private Guid? _selectedTenantId;
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var availableTenants = (await AuthHelperService.GetAvailableTenantsAsync()).ToList();
+        _tenants.Clear();
+        _tenants.AddRange(availableTenants);
+
+        _selectedTenantId = await AuthHelperService.GetTenantIdAsync();
+        if (!_selectedTenantId.HasValue && _tenants.Count > 0)
+        {
+            _selectedTenantId = _tenants[0].Id;
+            await AuthHelperService.SetActiveTenantIdAsync(_selectedTenantId.Value);
+        }
+
+        _loading = false;
+    }
+
+    private async Task OnTenantChanged(Guid? tenantId)
+    {
+        _selectedTenantId = tenantId;
+        await AuthHelperService.SetActiveTenantIdAsync(tenantId);
+    }
+}
