@@ -27,8 +27,8 @@ namespace Boxty.ServerBase.Endpoints
             group.MapPost("/Create", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] CreateCommand<T, TDto, TContext> createCommand,
-                [FromServices] CreateTenantCommand<T, TDto, TContext> createTenantCommand,
+                [FromServices] ICreateCommand<T, TDto, TContext> createCommand,
+                [FromServices] ICreateTenantCommand<T, TDto, TContext> createTenantCommand,
                 ClaimsPrincipal user,
                 TDto dto
             ) => Create(createTenantCommand, user, dto))
@@ -42,7 +42,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapDelete("/Delete/{id}", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] DeleteTenantCommand<T, TDto, TContext> deleteCommand,
+                [FromServices] IDeleteTenantCommand<T, TDto, TContext> deleteCommand,
                 ClaimsPrincipal user,
                 Guid id
             ) => Delete(deleteCommand, user, id))
@@ -50,7 +50,7 @@ namespace Boxty.ServerBase.Endpoints
         }
 
         protected async Task<IResult> Create(
-            CreateTenantCommand<T, TDto, TContext> createTenantCommand,
+            ICreateTenantCommand<T, TDto, TContext> createTenantCommand,
             ClaimsPrincipal user,
             TDto dto)
         {
@@ -79,7 +79,7 @@ namespace Boxty.ServerBase.Endpoints
                 return Results.Problem($"An error occurred while creating the {typeof(T).Name}.");
             }
         }
-        protected async Task<IResult> Delete(DeleteTenantCommand<T, TDto, TContext> deleteCommand, ClaimsPrincipal user, Guid id)
+        protected async Task<IResult> Delete(IDeleteTenantCommand<T, TDto, TContext> deleteCommand, ClaimsPrincipal user, Guid id)
         {
             try
             {

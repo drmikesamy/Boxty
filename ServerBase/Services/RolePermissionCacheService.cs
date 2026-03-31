@@ -44,7 +44,7 @@ namespace Boxty.ServerBase.Services
         public bool HasPermission(string permissionName, string roleName)
         {
             return _rolePermissionCache.TryGetValue(roleName, out var permissions) &&
-                   permissions.Contains(permissionName);
+                   (permissions.Contains("*") || permissions.Contains(permissionName));
         }
     }
 }

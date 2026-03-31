@@ -1,22 +1,17 @@
-﻿using System.Linq;
-using System.Reflection;
 using Boxty.ServerBase.Auth.Constants;
 using Boxty.ServerBase.Auth.Requirements;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.DependencyInjection;
 
-namespace Boxty.ServerBase.Auth.Extensions
+namespace Boxty.ServerBase.Auth.Policies
 {
     /// <summary>
-    /// Extension methods for registering permission-based authorization policies
+    /// Extension methods for registering permission-based authorization policies.
     /// </summary>
-    public static class AuthorizationExtensions
+    public static class PermissionPolicyExtensions
     {
         /// <summary>
-        /// Adds permission-based authorization policies for a specific entity type
+        /// Adds permission-based authorization policies for a specific entity type.
         /// </summary>
-        /// <typeparam name="TEntity">The entity type</typeparam>
-        /// <param name="options">Authorization options</param>
         public static void AddPermissionPoliciesForEntity<TEntity>(this AuthorizationOptions options)
         {
             var entityName = typeof(TEntity).Name;
@@ -24,13 +19,12 @@ namespace Boxty.ServerBase.Auth.Extensions
         }
 
         /// <summary>
-        /// Adds permission-based authorization policies for a specific entity type by name
+        /// Adds permission-based authorization policies for a specific entity type by name.
         /// </summary>
-        /// <param name="options">Authorization options</param>
-        /// <param name="entityName">The entity name</param>
         public static void AddPermissionPoliciesForEntity(this AuthorizationOptions options, string entityName)
         {
-            var operations = new[] {
+            var operations = new[]
+            {
                 PermissionOperations.Create,
                 PermissionOperations.View,
                 PermissionOperations.Update,
@@ -49,19 +43,31 @@ namespace Boxty.ServerBase.Auth.Extensions
         }
 
         /// <summary>
-        /// Adds permission-based authorization policies for all entity types that implement IEntity
+        /// Adds permission-based authorization policies for all entity types that implement IEntity or ISimpleEntity.
         /// </summary>
-        /// <param name="options">Authorization options</param>
         public static void AddPermissionPoliciesForEntities(this AuthorizationOptions options)
         {
             var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
-                .Where(t => t.IsClass && !t.IsAbstract && t.GetInterfaces().Any(i => i.Name == "IEntity" || i.Name == "ISimpleEntity"))
+                .SelectMany(GetLoadableTypes)
+                .Where(t => t.IsClass && !t.IsAbstract)
+                .Where(t => t.GetInterfaces().Any(i => i.Name == "IEntity" || i.Name == "ISimpleEntity"))
                 .ToList();
 
             foreach (var entityType in entityTypes)
             {
                 AddPermissionPoliciesForEntity(options, entityType.Name);
+            }
+        }
+
+        private static IEnumerable<Type> GetLoadableTypes(System.Reflection.Assembly assembly)
+        {
+            try
+            {
+                return assembly.GetTypes();
+            }
+            catch (System.Reflection.ReflectionTypeLoadException ex)
+            {
+                return ex.Types.Where(t => t != null)!;
             }
         }
     }

@@ -28,7 +28,7 @@ namespace Boxty.ServerBase.Endpoints
 
             // Add password reset endpoint
             group.MapPut("/resetpassword/{id:guid}", async (
-                [FromServices] ResetPasswordCommand<T, TDto, TContext> resetPasswordCommand,
+                [FromServices] IResetPasswordCommand<T, TDto, TContext> resetPasswordCommand,
                 ClaimsPrincipal user,
                 Guid id
             ) => await ResetPassword(resetPasswordCommand, user, id))
@@ -44,8 +44,8 @@ namespace Boxty.ServerBase.Endpoints
             group.MapPost("/Create", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] CreateCommand<T, TDto, TContext> createCommand,
-                [FromServices] CreateSubjectCommand<T, TDto, TContext> createSubjectCommand,
+                [FromServices] ICreateCommand<T, TDto, TContext> createCommand,
+                [FromServices] ICreateSubjectCommand<T, TDto, TContext> createSubjectCommand,
                 ClaimsPrincipal user,
                 TDto dto
             ) => Create(createSubjectCommand, user, dto))
@@ -59,7 +59,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapDelete("/Delete/{id}", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] DeleteSubjectCommand<T, TDto, TContext> deleteCommand,
+                [FromServices] IDeleteSubjectCommand<T, TDto, TContext> deleteCommand,
                 ClaimsPrincipal user,
                 Guid id
             ) => Delete(deleteCommand, user, id))
@@ -67,7 +67,7 @@ namespace Boxty.ServerBase.Endpoints
         }
 
         protected async Task<IResult> Create(
-            CreateSubjectCommand<T, TDto, TContext> createSubjectCommand,
+            ICreateSubjectCommand<T, TDto, TContext> createSubjectCommand,
             ClaimsPrincipal user,
             TDto dto)
         {
@@ -97,7 +97,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected async Task<IResult> Delete(DeleteSubjectCommand<T, TDto, TContext> deleteCommand, ClaimsPrincipal user, Guid id)
+        protected async Task<IResult> Delete(IDeleteSubjectCommand<T, TDto, TContext> deleteCommand, ClaimsPrincipal user, Guid id)
         {
             try
             {
@@ -112,7 +112,7 @@ namespace Boxty.ServerBase.Endpoints
         }
 
         protected async Task<IResult> ResetPassword(
-            ResetPasswordCommand<T, TDto, TContext> resetPasswordCommand,
+            IResetPasswordCommand<T, TDto, TContext> resetPasswordCommand,
             ClaimsPrincipal user,
             Guid id)
         {

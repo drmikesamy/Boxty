@@ -25,8 +25,6 @@ namespace Boxty.ServerBase.Commands
         where TDto : IDto, IAuditDto, ISubject
         where TContext : IDbContext<TContext>
     {
-        private IDbContext<TContext> _dbContext { get; }
-        private IMapper<T, TDto> _mapper { get; }
         private readonly IKeycloakService _keycloakService;
         private readonly IValidator<TDto> _validator;
         private readonly IUserContextService _userContextService;
@@ -34,8 +32,6 @@ namespace Boxty.ServerBase.Commands
         private readonly AppOptions _options;
 
         public CreateSubjectCommand(
-            IDbContext<TContext> dbContext,
-            IMapper<T, TDto> mapper,
             IKeycloakService keycloakService,
             IValidator<TDto> validator,
             IUserContextService userContextService,
@@ -43,8 +39,6 @@ namespace Boxty.ServerBase.Commands
             IOptions<AppOptions> options
         )
         {
-            _dbContext = dbContext;
-            _mapper = mapper;
             _keycloakService = keycloakService;
             _validator = validator;
             _userContextService = userContextService;
@@ -84,19 +78,15 @@ namespace Boxty.ServerBase.Commands
                 var existingUsers = await _keycloakService.GetUsersAsync(dto.Email, 1);
                 var newId = existingUsers?.FirstOrDefault()?.Id;
 
-                if (!string.IsNullOrEmpty(newId))
+                if (string.IsNullOrEmpty(newId))
                 {
-                    await _keycloakService.PostOrganizationMemberAsync(dto.TenantId.ToString(), newId);
-                    await _keycloakService.PostUserRoleMappingAsync(newId, new List<RoleRepresentation> { validationContext.ValidatedRole });
+                    throw new InvalidOperationException("Subject was created in Keycloak but no user ID was returned.");
                 }
 
-                var newEntity = _mapper.Map(dto);
-                newEntity.Id = newId != null ? Guid.Parse(newId) : Guid.NewGuid();
+                await _keycloakService.PostOrganizationMemberAsync(dto.TenantId.ToString(), newId);
+                await _keycloakService.PostUserRoleMappingAsync(newId, new List<RoleRepresentation> { validationContext.ValidatedRole });
 
-                _dbContext.Set<T>().Add(newEntity);
-                await _dbContext.SaveChangesWithAuditAsync(user);
-
-                dto.Id = newEntity.Id;
+                dto.Id = Guid.Parse(newId);
 
                 await SendWelcomeEmailAsync(dto, newTemporaryPassword, user);
 

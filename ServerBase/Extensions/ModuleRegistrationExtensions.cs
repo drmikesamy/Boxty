@@ -1,12 +1,12 @@
 ﻿using System.Reflection;
 using Boxty.ServerBase.Auth.AuthorizationHandlers;
-using Boxty.ServerBase.Auth.Extensions;
-using Boxty.ServerBase.Auth.Providers;
+using Boxty.ServerBase.Auth.Policies;
 using Boxty.ServerBase.Commands;
 using Boxty.ServerBase.Endpoints;
 using Boxty.ServerBase.Mappers;
 using Boxty.ServerBase.Modules;
 using Boxty.ServerBase.Queries;
+using Boxty.ServerBase.Queries.ModuleQueries;
 using Boxty.ServerBase.Services;
 using Boxty.ServerBase.Services.Interfaces;
 using Boxty.ServerBase.Auth.Requirements;
@@ -28,21 +28,24 @@ namespace Boxty.ServerBase.Extensions
             registeredModules = new List<IModule>();
 
             // Register open generic query/command handlers for all modules
-            services.AddTransient(typeof(GetAllQuery<,,>), typeof(GetAllQuery<,,>));
-            services.AddTransient(typeof(GetByIdQuery<,,>), typeof(GetByIdQuery<,,>));
-            services.AddTransient(typeof(GetByIdsQuery<,,>), typeof(GetByIdsQuery<,,>));
-            services.AddTransient(typeof(GetPagedQuery<,,>), typeof(GetPagedQuery<,,>));
-            services.AddTransient(typeof(SearchQuery<,,>), typeof(SearchQuery<,,>));
-            services.AddTransient(typeof(CreateCommand<,,>), typeof(CreateCommand<,,>));
-            services.AddTransient(typeof(UpdateCommand<,,>), typeof(UpdateCommand<,,>));
-            services.AddTransient(typeof(DeleteCommand<,>), typeof(DeleteCommand<,>));
-            services.AddTransient(typeof(CreateSubjectCommand<,,>), typeof(CreateSubjectCommand<,,>));
-            services.AddTransient(typeof(CreateTenantCommand<,,>), typeof(CreateTenantCommand<,,>));
-            services.AddTransient(typeof(ResetPasswordCommand<,,>), typeof(ResetPasswordCommand<,,>));
-            services.AddTransient(typeof(DeleteTenantCommand<,,>), typeof(DeleteTenantCommand<,,>));
-            services.AddTransient(typeof(DeleteSubjectCommand<,,>), typeof(DeleteSubjectCommand<,,>));
-            services.AddTransient(typeof(ISendEmailCommand), typeof(SendEmailCommand));
-            services.AddTransient(typeof(IEmailService), typeof(EmailService));
+            services.AddScoped(typeof(IGetAllQuery<,,>), typeof(GetAllQuery<,,>));
+            services.AddScoped(typeof(IGetByIdQuery<,,>), typeof(GetByIdQuery<,,>));
+            services.AddScoped(typeof(IGetByIdsQuery<,,>), typeof(GetByIdsQuery<,,>));
+            services.AddScoped(typeof(IGetPagedQuery<,,>), typeof(GetPagedQuery<,,>));
+            services.AddScoped(typeof(ISearchQuery<,,>), typeof(SearchQuery<,,>));
+            services.AddScoped(typeof(ICreateCommand<,,>), typeof(CreateCommand<,,>));
+            services.AddScoped(typeof(IUpdateCommand<,,>), typeof(UpdateCommand<,,>));
+            services.AddScoped(typeof(IDeleteCommand<,>), typeof(DeleteCommand<,>));
+            services.AddScoped(typeof(ICreateSubjectCommand<,,>), typeof(CreateSubjectCommand<,,>));
+            services.AddScoped(typeof(ICreateTenantCommand<,,>), typeof(CreateTenantCommand<,,>));
+            services.AddScoped(typeof(IResetPasswordCommand<,,>), typeof(ResetPasswordCommand<,,>));
+            services.AddScoped(typeof(IDeleteTenantCommand<,,>), typeof(DeleteTenantCommand<,,>));
+            services.AddScoped(typeof(IDeleteSubjectCommand<,,>), typeof(DeleteSubjectCommand<,,>));
+            services.AddScoped<IGetAllRolesWithPermissionsQuery, GetAllRolesWithPermissionsFromKeycloakQuery>();
+            services.AddScoped(typeof(ISendEmailCommand), typeof(SendEmailCommand));
+            services.AddScoped(typeof(IEmailService), typeof(EmailService));
+            services.AddScoped<IGetSubjectByIdQuery, GetSubjectByIdQuery>();
+            services.AddScoped<IGetTenantByIdQuery, GetTenantByIdQuery>();
 
             var baseModule = new BaseModule();
             baseModule.RegisterModuleServices(services, configuration);
@@ -75,7 +78,7 @@ namespace Boxty.ServerBase.Extensions
 
             services.AddScoped<IAuthorizationHandler, ResourceAccessAuthorizationHandler>();
             services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
-            ResourceAccessPolicyProvider.AddRequirement(new ResourceAccessRequirement());
+            ResourceAccessPolicyRegistry.AddRequirement(new ResourceAccessRequirement());
 
             foreach (var moduleType in moduleTypes)
             {
@@ -98,13 +101,15 @@ namespace Boxty.ServerBase.Extensions
             services.AddAuthorization(options =>
             {
                 options.AddPermissionPoliciesForEntities();
-                ResourceAccessPolicyProvider.BuildPolicy(options);
+                ResourceAccessPolicyRegistry.BuildPolicy(options);
             });
 
             return services;
         }
         public static WebApplication ConfigureServicesAndMapEndpoints(this WebApplication app, bool isDevelopment, List<IModule> registeredModules)
         {
+            ValidatePermissionProviderRegistration(app.Services);
+
             var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
             var logger = loggerFactory.CreateLogger("ModuleRegistration");
             logger.LogInformation("Configuring {ModuleCount} modules and mapping endpoints...", registeredModules.Count);
@@ -148,6 +153,26 @@ namespace Boxty.ServerBase.Extensions
 
             logger.LogInformation("Module configuration and endpoint mapping completed");
             return app;
+        }
+
+        private static void ValidatePermissionProviderRegistration(IServiceProvider services)
+        {
+            using var scope = services.CreateScope();
+            var permissionQueries = scope.ServiceProvider.GetServices<IGetAllRolesWithPermissionsQuery>().ToList();
+
+            if (permissionQueries.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "No IGetAllRolesWithPermissionsQuery implementation registered. " +
+                    "Register a permission provider to enable fine-grained server authorization.");
+            }
+
+            if (permissionQueries.Count > 1)
+            {
+                throw new InvalidOperationException(
+                    $"Multiple IGetAllRolesWithPermissionsQuery implementations registered ({permissionQueries.Count}). " +
+                    "Register exactly one permission provider.");
+            }
         }
     }
 }

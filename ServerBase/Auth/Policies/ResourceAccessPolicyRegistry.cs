@@ -1,21 +1,21 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 
-namespace Boxty.ServerBase.Auth.Providers
+namespace Boxty.ServerBase.Auth.Policies
 {
-    public static class ResourceAccessPolicyProvider
+    public static class ResourceAccessPolicyRegistry
     {
-        private static readonly List<IAuthorizationRequirement> _requirements = new();
+        private static readonly List<IAuthorizationRequirement> Requirements = [];
 
         public static void AddRequirement(IAuthorizationRequirement requirement)
         {
-            _requirements.Add(requirement);
+            Requirements.Add(requirement);
         }
 
         public static void BuildPolicy(AuthorizationOptions options)
         {
             options.AddPolicy("resource-access", policy =>
             {
-                foreach (var requirement in _requirements)
+                foreach (var requirement in Requirements)
                 {
                     policy.Requirements.Add(requirement);
                 }

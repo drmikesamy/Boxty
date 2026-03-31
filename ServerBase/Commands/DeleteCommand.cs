@@ -9,7 +9,14 @@ namespace Boxty.ServerBase.Commands
     {
         Task<bool> Handle(Guid id, ClaimsPrincipal user);
     }
-    public class DeleteCommand<T, TContext> : IDeleteCommand, ICommand
+
+    public interface IDeleteCommand<T, TContext> : IDeleteCommand
+        where T : class
+        where TContext : IDbContext<TContext>
+    {
+    }
+
+    public class DeleteCommand<T, TContext> : IDeleteCommand<T, TContext>, ICommand
         where T : class
         where TContext : IDbContext<TContext>
     {

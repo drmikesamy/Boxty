@@ -36,6 +36,7 @@ namespace Boxty.ServerBase.Services
         Task DeleteUserRoleMappingAsync(string userId, ICollection<RoleRepresentation> roles);
         Task CreateRoleAsync(RoleRepresentation role);
         Task DeleteRoleAsync(string roleName);
+        Task UpdateRoleAsync(string roleName, RoleRepresentation role);
         Task UpdateUserAsync(string userId, UserRepresentation userRepresentation);
     }
 
@@ -155,6 +156,12 @@ namespace Boxty.ServerBase.Services
         {
             using var rolesApi = CreateRolesApi();
             await rolesApi.DeleteRolesByRoleNameAsync(GetRealmName(), roleName.ToLowerInvariant());
+        }
+
+        public async Task UpdateRoleAsync(string roleName, RoleRepresentation role)
+        {
+            using var rolesApi = CreateRolesApi();
+            await rolesApi.PutRolesByRoleNameAsync(GetRealmName(), roleName.ToLowerInvariant(), role);
         }
 
         public async Task UpdateUserAsync(string userId, UserRepresentation userRepresentation)

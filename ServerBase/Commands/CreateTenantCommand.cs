@@ -3,13 +3,11 @@ using Boxty.ServerBase.Database;
 using Boxty.ServerBase.Entities;
 using Boxty.ServerBase.Helpers;
 using Boxty.ServerBase.Interfaces;
-using Boxty.ServerBase.Mappers;
 using Boxty.ServerBase.Services;
 using Boxty.SharedBase.DTOs;
 using Boxty.SharedBase.Interfaces;
 using FluentValidation;
 using FS.Keycloak.RestApiClient.Model;
-using Microsoft.AspNetCore.Authorization;
 
 namespace Boxty.ServerBase.Commands
 {
@@ -23,23 +21,14 @@ namespace Boxty.ServerBase.Commands
         where TDto : IDto, ITenant
         where TContext : IDbContext<TContext>
     {
-        private IDbContext<TContext> _dbContext { get; }
-        private IMapper<T, TDto> _mapper { get; }
-        private readonly IAuthorizationService _authorizationService;
         private readonly IKeycloakService _keycloakService;
         private readonly IValidator<TDto> _validator;
 
         public CreateTenantCommand(
-            IDbContext<TContext> dbContext,
-            IMapper<T, TDto> mapper,
-            IAuthorizationService authorizationService,
             IKeycloakService keycloakService,
             IValidator<TDto> validator
         )
         {
-            _dbContext = dbContext;
-            _mapper = mapper;
-            _authorizationService = authorizationService;
             _keycloakService = keycloakService;
             _validator = validator;
         }
@@ -69,14 +58,13 @@ namespace Boxty.ServerBase.Commands
                 var newOrganizations = await _keycloakService.GetOrganizationsAsync(tenantName);
                 var newId = newOrganizations?.FirstOrDefault()?.Id;
 
-                // Save to database
-                var newEntity = _mapper.Map(dto);
-                newEntity.Id = newId != null ? Guid.Parse(newId) : Guid.NewGuid();
+                if (string.IsNullOrEmpty(newId))
+                {
+                    throw new InvalidOperationException("Tenant was created in Keycloak but no organization ID was returned.");
+                }
 
-                _dbContext.Set<T>().Add(newEntity);
-                await _dbContext.SaveChangesWithAuditAsync(user);
+                dto.Id = Guid.Parse(newId);
 
-                dto.Id = newEntity.Id;
                 return dto.Id;
             }
             catch (ValidationException)

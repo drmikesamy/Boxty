@@ -41,7 +41,7 @@ namespace Boxty.ServerBase.Endpoints
                 [FromServices] IMapper<T, TDto> mapper,
                 [FromServices] BlobServiceClient blobServiceClient,
                 [FromServices] Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
-                [FromServices] GetByIdQuery<T, TDto, TContext> getByIdQuery,
+                [FromServices] IGetByIdQuery<T, TDto, TContext> getByIdQuery,
                 Guid documentGuid,
                 ClaimsPrincipal user
             ) => await GetDocumentSasLink(getByIdQuery, blobServiceClient, authorizationService, documentGuid, user));
@@ -96,7 +96,7 @@ namespace Boxty.ServerBase.Endpoints
         }
 
         protected async Task<IResult> GetDocumentSasLink(
-            GetByIdQuery<T, TDto, TContext> getByIdQuery,
+            IGetByIdQuery<T, TDto, TContext> getByIdQuery,
             BlobServiceClient blobServiceClient,
             Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
             Guid documentGuid,

@@ -43,7 +43,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapGet("/GetAll", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetAllQuery<T, TDto, TContext> getAllQuery,
+                [FromServices] IGetAllQuery<T, TDto, TContext> getAllQuery,
                 ClaimsPrincipal user,
                 [FromQuery] Guid? tenantId = null,
                 [FromQuery] Guid? subjectId = null
@@ -53,7 +53,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapGet("/GetById/{id}", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetByIdQuery<T, TDto, TContext> getByIdQuery,
+                [FromServices] IGetByIdQuery<T, TDto, TContext> getByIdQuery,
                 ClaimsPrincipal user,
                 Guid id,
                 [FromQuery] Guid? tenantId = null,
@@ -64,7 +64,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapPost("/GetByIds", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetByIdsQuery<T, TDto, TContext> getByIdsQuery,
+                [FromServices] IGetByIdsQuery<T, TDto, TContext> getByIdsQuery,
                 ClaimsPrincipal user,
                 List<Guid> ids,
                 [FromQuery] Guid? tenantId = null,
@@ -75,7 +75,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapGet("/Search", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] SearchQuery<T, TDto, TContext> searchQuery,
+                [FromServices] ISearchQuery<T, TDto, TContext> searchQuery,
                 ClaimsPrincipal user,
                 [FromQuery] string term,
                 [FromQuery] Guid? tenantId = null,
@@ -86,7 +86,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapGet("/Paged", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetPagedQuery<T, TDto, TContext> getPagedQuery,
+                [FromServices] IGetPagedQuery<T, TDto, TContext> getPagedQuery,
                 ClaimsPrincipal user,
                 [FromQuery] int page = 1,
                 [FromQuery] int pageSize = 10,
@@ -117,7 +117,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapPost("/Create", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] CreateCommand<T, TDto, TContext> createCommand,
+                [FromServices] ICreateCommand<T, TDto, TContext> createCommand,
                 [FromServices] IServiceProvider serviceProvider,
                 ClaimsPrincipal user,
                 TDto dto
@@ -133,7 +133,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapPut("/Update", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] UpdateCommand<T, TDto, TContext> updateCommand,
+                [FromServices] IUpdateCommand<T, TDto, TContext> updateCommand,
                 [FromServices] IServiceProvider serviceProvider,
                 ClaimsPrincipal user,
                 TDto dto
@@ -149,7 +149,7 @@ namespace Boxty.ServerBase.Endpoints
             group.MapDelete("/Delete/{id}", (
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] DeleteCommand<T, TContext> deleteCommand,
+                [FromServices] IDeleteCommand<T, TContext> deleteCommand,
                 [FromServices] IServiceProvider serviceProvider,
                 ClaimsPrincipal user,
                 Guid id
@@ -157,7 +157,7 @@ namespace Boxty.ServerBase.Endpoints
             .RequireAuthorization($"Permission:{deletePermission}");
         }
 
-        protected async Task<IResult> GetAll(GetAllQuery<T, TDto, TContext> getAllQuery, ClaimsPrincipal user, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetAll(IGetAllQuery<T, TDto, TContext> getAllQuery, ClaimsPrincipal user, Guid? tenantId, Guid? subjectId)
         {
             try
             {
@@ -173,7 +173,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected async Task<IResult> GetById(GetByIdQuery<T, TDto, TContext> getByIdQuery, ClaimsPrincipal user, Guid id, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetById(IGetByIdQuery<T, TDto, TContext> getByIdQuery, ClaimsPrincipal user, Guid id, Guid? tenantId, Guid? subjectId)
         {
             try
             {
@@ -189,7 +189,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected async Task<IResult> GetByIds(GetByIdsQuery<T, TDto, TContext> getByIdsQuery, ClaimsPrincipal user, List<Guid> ids, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetByIds(IGetByIdsQuery<T, TDto, TContext> getByIdsQuery, ClaimsPrincipal user, List<Guid> ids, Guid? tenantId, Guid? subjectId)
         {
             try
             {
@@ -205,7 +205,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected async Task<IResult> GetPaged(GetPagedQuery<T, TDto, TContext> getPagedQuery, ClaimsPrincipal user, int page, int pageSize, FetchFilter? filter, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetPaged(IGetPagedQuery<T, TDto, TContext> getPagedQuery, ClaimsPrincipal user, int page, int pageSize, FetchFilter? filter, Guid? tenantId, Guid? subjectId)
         {
             try
             {
@@ -239,7 +239,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected async Task<IResult> Search(SearchQuery<T, TDto, TContext> searchQuery, ClaimsPrincipal user, string term, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> Search(ISearchQuery<T, TDto, TContext> searchQuery, ClaimsPrincipal user, string term, Guid? tenantId, Guid? subjectId)
         {
             try
             {
@@ -255,7 +255,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected virtual async Task<IResult> Create(CreateCommand<T, TDto, TContext> createCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
+        protected virtual async Task<IResult> Create(ICreateCommand<T, TDto, TContext> createCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
         {
             try
             {
@@ -285,7 +285,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected virtual async Task<IResult> Update(UpdateCommand<T, TDto, TContext> updateCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
+        protected virtual async Task<IResult> Update(IUpdateCommand<T, TDto, TContext> updateCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
         {
             try
             {
@@ -315,7 +315,7 @@ namespace Boxty.ServerBase.Endpoints
             }
         }
 
-        protected async Task<IResult> Delete(DeleteCommand<T, TContext> deleteCommand, ClaimsPrincipal user, Guid id, IServiceProvider serviceProvider)
+        protected async Task<IResult> Delete(IDeleteCommand<T, TContext> deleteCommand, ClaimsPrincipal user, Guid id, IServiceProvider serviceProvider)
         {
             try
             {

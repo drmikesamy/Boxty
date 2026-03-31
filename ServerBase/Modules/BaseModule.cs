@@ -1,16 +1,17 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Boxty.ServerBase.Auth.Endpoints;
 using Boxty.ServerBase.Config;
 using Boxty.ServerBase.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using System.Reflection;
 
 namespace Boxty.ServerBase.Modules
 {
@@ -76,6 +77,7 @@ namespace Boxty.ServerBase.Modules
             services.AddHttpClient();
 
             services.AddSingleton<IRolePermissionCacheService, RolePermissionCacheService>();
+            services.AddHostedService<RolePermissionCacheRefreshBackgroundService>();
             services.AddScoped<IUserContextService, UserContextService>();
 
             return services;
@@ -111,6 +113,19 @@ namespace Boxty.ServerBase.Modules
             logger.LogInformation("Initializing role permission cache...");
             InitializeRolePermissionCache(app).GetAwaiter().GetResult();
             logger.LogInformation("Role permission cache initialized successfully");
+
+            app.MapPost("/api/admin/permissions/refresh", async (IRolePermissionCacheService cacheService) =>
+            {
+                await cacheService.InitAsync();
+                return Results.Ok(new
+                {
+                    message = "Permission cache refreshed",
+                    refreshedAtUtc = DateTime.UtcNow
+                });
+            })
+            .RequireAuthorization(policy => policy.RequireRole("administrator"));
+
+            app.MapAuthManagementEndpoints();
 
             if (isDevelopment)
             {
