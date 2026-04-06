@@ -43,14 +43,14 @@ namespace Boxty.ServerBase.Auth.Policies
         }
 
         /// <summary>
-        /// Adds permission-based authorization policies for all entity types that implement IEntity or ISimpleEntity.
+        /// Adds permission-based authorization policies for all entity types that implement IEntity.
         /// </summary>
         public static void AddPermissionPoliciesForEntities(this AuthorizationOptions options)
         {
             var entityTypes = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(GetLoadableTypes)
                 .Where(t => t.IsClass && !t.IsAbstract)
-                .Where(t => t.GetInterfaces().Any(i => i.Name == "IEntity" || i.Name == "ISimpleEntity"))
+                .Where(t => t.GetInterfaces().Any(i => i.Name == "IEntity"))
                 .ToList();
 
             foreach (var entityType in entityTypes)

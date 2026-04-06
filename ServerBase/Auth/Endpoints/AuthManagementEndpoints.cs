@@ -115,7 +115,7 @@ namespace Boxty.ServerBase.Auth.Endpoints
             var entityTypeNames = AppDomain.CurrentDomain.GetAssemblies()
                 .SelectMany(GetLoadableTypes)
                 .Where(t => t.IsClass && !t.IsAbstract)
-                .Where(t => t.GetInterfaces().Any(i => i.Name == "IEntity" || i.Name == "ISimpleEntity"))
+                .Where(t => t.GetInterfaces().Any(i => i.Name == "IEntity"))
                 .Select(t => t.Name)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
