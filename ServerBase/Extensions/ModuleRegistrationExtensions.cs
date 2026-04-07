@@ -85,7 +85,6 @@ namespace Boxty.ServerBase.Extensions
                 try
                 {
                     var sharedAssemblyName = "Boxty.SharedApp";
-                    Console.WriteLine($"shared assembly is {sharedAssemblyName}");
                     if (!string.IsNullOrEmpty(sharedAssemblyName))
                     {
                         var moduleSharedAssembly = Assembly.Load(sharedAssemblyName);

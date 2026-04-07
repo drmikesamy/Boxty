@@ -33,34 +33,24 @@ namespace Boxty.ServerBase.Queries
 
         public async Task<TDto?> Handle(Guid id, ClaimsPrincipal user, Guid? tenantId = null, Guid? subjectId = null, params Expression<Func<T, object>>[]? includes)
         {
-            var query = _dbContext.Set<T>().AsQueryable();
-            query = query.Where(x => x.Id == id);
-            if (tenantId != null)
-            {
-                query = query.Where(e => e.TenantId == tenantId);
-            }
-            if (subjectId != null)
-            {
-                query = query.Where(e => e.SubjectId == subjectId);
-            }
-            query = query.AsNoTracking();
-            if (includes != null && includes.Length > 0)
-            {
-                foreach (var include in includes)
-                {
-                    query = query.Include(include);
-                }
-            }
+            var query = QueryAccessHelper.ApplyScopeFilters(_dbContext.Set<T>().AsQueryable(), tenantId, subjectId)
+                .Where(x => x.Id == id)
+                .AsNoTracking();
+
+            query = QueryAccessHelper.ApplyIncludes(query, includes);
+
             var entity = await query.SingleOrDefaultAsync();
             if (entity == null)
             {
                 return default(TDto);
             }
+
             var authResult = await _authorizationService.AuthorizeAsync(user, entity, "resource-access");
             if (!authResult.Succeeded)
             {
                 throw new UnauthorizedAccessException("Authorization failed for resource-access policy.");
             }
+
             return _mapper.Map(entity, user);
         }
     }

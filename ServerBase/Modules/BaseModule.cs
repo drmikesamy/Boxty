@@ -111,7 +111,7 @@ namespace Boxty.ServerBase.Modules
             logger.LogDebug("Authentication and authorization configured");
 
             logger.LogInformation("Initializing role permission cache...");
-            InitializeRolePermissionCache(app).GetAwaiter().GetResult();
+            InitializeRolePermissionCache(app, logger).GetAwaiter().GetResult();
             logger.LogInformation("Role permission cache initialized successfully");
 
             app.MapPost("/api/admin/permissions/refresh", async (IRolePermissionCacheService cacheService) =>
@@ -143,24 +143,23 @@ namespace Boxty.ServerBase.Modules
             return app;
         }
 
-        private async Task InitializeRolePermissionCache(WebApplication app)
+        private async Task InitializeRolePermissionCache(WebApplication app, ILogger<BaseModule> logger)
         {
             try
             {
-                Console.WriteLine("Starting role permission cache initialization...");
+                logger.LogDebug("Starting role permission cache initialization");
 
                 using var scope = app.Services.CreateScope();
                 var cacheService = scope.ServiceProvider.GetRequiredService<IRolePermissionCacheService>();
 
-                Console.WriteLine("Cache service obtained, calling InitAsync...");
+                logger.LogDebug("Role permission cache service resolved, invoking initialization");
                 await cacheService.InitAsync();
 
-                Console.WriteLine("Role permission cache initialized successfully with!");
+                logger.LogInformation("Role permission cache initialized successfully");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Failed to initialize role permission cache: {ex.Message}");
-                Console.WriteLine($"Exception details: {ex}");
+                logger.LogWarning(ex, "Failed to initialize role permission cache");
             }
         }
 

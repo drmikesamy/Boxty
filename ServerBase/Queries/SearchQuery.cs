@@ -38,18 +38,9 @@ namespace Boxty.ServerBase.Queries
             {
                 return Enumerable.Empty<TDto>();
             }
-            var query = _dbContext.Set<T>().AsQueryable();
+            var query = QueryAccessHelper.ApplyScopeFilters(_dbContext.Set<T>().AsQueryable(), tenantId, subjectId)
+                .AsNoTracking();
 
-            if (tenantId != null)
-            {
-                query = query.Where(e => e.TenantId == tenantId);
-            }
-            if (subjectId != null)
-            {
-                query = query.Where(e => e.SubjectId == subjectId);
-            }
-
-            query = query.AsNoTracking();
             if (typeof(ISearchTags).IsAssignableFrom(typeof(T)))
             {
                 var loweredTerm = searchTerm.ToLower();
@@ -62,13 +53,8 @@ namespace Boxty.ServerBase.Queries
             {
                 throw new InvalidOperationException($"The type {typeof(T).Name} is not searchable.");
             }
-            if (includes != null && includes.Length > 0)
-            {
-                foreach (var include in includes)
-                {
-                    query = query.Include(include);
-                }
-            }
+            query = QueryAccessHelper.ApplyIncludes(query, includes);
+
             var entities = await query.ToListAsync();
             var authorizedEntities = new List<TDto>();
             foreach (var entity in entities)
@@ -79,6 +65,7 @@ namespace Boxty.ServerBase.Queries
                     authorizedEntities.Add(_mapper.Map(entity, user));
                 }
             }
+
             return authorizedEntities;
         }
     }

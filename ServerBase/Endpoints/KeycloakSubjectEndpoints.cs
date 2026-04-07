@@ -3,7 +3,6 @@ using Boxty.ServerBase.Auth.Constants;
 using Boxty.ServerBase.Commands;
 using Boxty.ServerBase.Database;
 using Boxty.ServerBase.Entities;
-using Boxty.ServerBase.Mappers;
 using Boxty.SharedBase.DTOs;
 using Boxty.SharedBase.Interfaces;
 using FluentValidation;
@@ -42,9 +41,6 @@ namespace Boxty.ServerBase.Endpoints
             var createPermission = PermissionHelper.GeneratePermission<T>(PermissionOperations.Create);
 
             group.MapPost("/Create", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] ICreateCommand<T, TDto, TContext> createCommand,
                 [FromServices] ICreateSubjectCommand<T, TDto, TContext> createSubjectCommand,
                 ClaimsPrincipal user,
                 TDto dto
@@ -57,8 +53,6 @@ namespace Boxty.ServerBase.Endpoints
             var deletePermission = PermissionHelper.GeneratePermission<T>(PermissionOperations.Delete);
 
             group.MapDelete("/Delete/{id}", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
                 [FromServices] IDeleteSubjectCommand<T, TDto, TContext> deleteCommand,
                 ClaimsPrincipal user,
                 Guid id
@@ -71,44 +65,20 @@ namespace Boxty.ServerBase.Endpoints
             ClaimsPrincipal user,
             TDto dto)
         {
-            try
+            return await ExecuteWithValidation(async () =>
             {
                 var result = await createSubjectCommand.Handle(dto, user);
                 return Results.Ok(result);
-            }
-            catch (ValidationException validationEx)
-            {
-                // Return validation errors as a structured response
-                var errors = validationEx.Errors.Select(e => new
-                {
-                    Property = e.PropertyName,
-                    Message = e.ErrorMessage
-                });
-                return Results.BadRequest(new
-                {
-                    message = "Validation failed",
-                    errors = errors
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while creating the {typeof(T).Name}.");
-            }
+            }, $"An error occurred while creating the {typeof(T).Name}.");
         }
 
         protected async Task<IResult> Delete(IDeleteSubjectCommand<T, TDto, TContext> deleteCommand, ClaimsPrincipal user, Guid id)
         {
-            try
+            return await Execute(async () =>
             {
                 var result = await deleteCommand.Handle(id, user);
                 return Results.Ok(result);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while deleting the {typeof(T).Name}.");
-            }
+            }, $"An error occurred while deleting the {typeof(T).Name}.");
         }
 
         protected async Task<IResult> ResetPassword(
@@ -124,31 +94,22 @@ namespace Boxty.ServerBase.Endpoints
             catch (ValidationException ex)
             {
                 var errors = ex.Errors.Select(e => new { Field = e.PropertyName, Message = e.ErrorMessage });
-                Console.Error.WriteLine($"Validation error: {string.Join(", ", ex.Errors.Select(e => $"{e.PropertyName}: {e.ErrorMessage}"))}");
                 return Results.BadRequest(new { Message = "Validation failed", Errors = errors });
             }
             catch (InvalidOperationException ex)
             {
-                Console.Error.WriteLine($"Business logic error: {ex.Message}");
                 return Results.BadRequest(new { Message = ex.Message });
             }
-            catch (UnauthorizedAccessException ex)
+            catch (UnauthorizedAccessException)
             {
-                Console.Error.WriteLine($"Unauthorized access error: {ex.Message}");
                 return Results.Forbid();
             }
             catch (ArgumentNullException ex)
             {
-                Console.Error.WriteLine($"Null argument error: {ex.Message}");
                 return Results.BadRequest(new { Message = $"Required field missing: {ex.ParamName}" });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                Console.Error.WriteLine($"Unexpected error occurred while resetting password: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    Console.Error.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                }
                 return Results.Problem("An unexpected error occurred while resetting the password. Please try again.");
             }
         }

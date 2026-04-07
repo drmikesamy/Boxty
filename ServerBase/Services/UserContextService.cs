@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 
 namespace Boxty.ServerBase.Services
 {
@@ -9,6 +10,13 @@ namespace Boxty.ServerBase.Services
     /// </summary>
     public class UserContextService : IUserContextService
     {
+        private readonly ILogger<UserContextService> _logger;
+
+        public UserContextService(ILogger<UserContextService> logger)
+        {
+            _logger = logger;
+        }
+
         /// <summary>
         /// Gets the subject id ("sub" claim) from the JWT.
         /// </summary>
@@ -28,7 +36,6 @@ namespace Boxty.ServerBase.Services
 
             try
             {
-                Console.WriteLine($"Parsing Organization Claim: {orgClaim}");
                 using var doc = JsonDocument.Parse(orgClaim);
                 var root = doc.RootElement;
                 // Handle array format (existing logic)
@@ -53,9 +60,9 @@ namespace Boxty.ServerBase.Services
                     }
                 }
             }
-            catch
+            catch (JsonException ex)
             {
-                // Ignore parse errors and return empty string
+                _logger.LogDebug(ex, "Failed to parse organization claim");
             }
             return string.Empty;
         }
@@ -103,9 +110,9 @@ namespace Boxty.ServerBase.Services
                         }
                     }
                 }
-                catch
+                catch (JsonException ex)
                 {
-                    // Ignore parse errors
+                    _logger.LogDebug(ex, "Failed to parse realm_access claim");
                 }
             }
 
@@ -132,9 +139,9 @@ namespace Boxty.ServerBase.Services
                         }
                     }
                 }
-                catch
+                catch (JsonException ex)
                 {
-                    // Ignore parse errors
+                    _logger.LogDebug(ex, "Failed to parse resource_access claim");
                 }
             }
 

@@ -32,26 +32,11 @@ namespace Boxty.ServerBase.Queries
         }
         public async Task<IEnumerable<TDto>> Handle(ClaimsPrincipal user, Guid? tenantId = null, Guid? subjectId = null, params Expression<Func<T, object>>[]? includes)
         {
-            var query = _dbContext.Set<T>().AsQueryable();
+            var query = QueryAccessHelper.ApplyScopeFilters(_dbContext.Set<T>().AsQueryable(), tenantId, subjectId)
+                .AsNoTracking();
 
-            if (tenantId != null)
-            {
-                query = query.Where(e => e.TenantId == tenantId);
-            }
-            if (subjectId != null)
-            {
-                query = query.Where(e => e.SubjectId == subjectId);
-            }
+            query = QueryAccessHelper.ApplyIncludes(query, includes);
 
-            query = query.AsNoTracking();
-
-            if (includes != null && includes.Length > 0)
-            {
-                foreach (var include in includes)
-                {
-                    query = query.Include(include);
-                }
-            }
             var entities = await query.ToListAsync();
             var authorizedEntities = new List<TDto>();
             foreach (var entity in entities)
@@ -62,6 +47,7 @@ namespace Boxty.ServerBase.Queries
                     authorizedEntities.Add(_mapper.Map(entity, user));
                 }
             }
+
             return authorizedEntities;
         }
     }

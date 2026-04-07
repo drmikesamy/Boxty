@@ -34,15 +34,7 @@ namespace Boxty.ServerBase.Queries
         }
         public async Task<PagedResult<TDto>> Handle(int page, int pageSize, ClaimsPrincipal user, FetchFilter? filter = null, Guid? tenantId = null, Guid? subjectId = null, params Expression<Func<T, object>>[]? includes)
         {
-            var query = _dbContext.Set<T>().AsQueryable();
-            if (tenantId != null)
-            {
-                query = query.Where(e => e.TenantId == tenantId);
-            }
-            if (subjectId != null)
-            {
-                query = query.Where(e => e.SubjectId == subjectId);
-            }
+            var query = QueryAccessHelper.ApplyScopeFilters(_dbContext.Set<T>().AsQueryable(), tenantId, subjectId);
 
             // Apply basic FetchFilter conditions that can be done at the entity level
             if (filter != null)
@@ -63,17 +55,10 @@ namespace Boxty.ServerBase.Queries
                 }
             }
 
-            // Get total count before pagination
             var totalCount = await query.CountAsync();
 
             query = query.AsNoTracking();
-            if (includes != null && includes.Length > 0)
-            {
-                foreach (var include in includes)
-                {
-                    query = query.Include(include);
-                }
-            }
+            query = QueryAccessHelper.ApplyIncludes(query, includes);
             var entities = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
             var authorizedEntities = new List<TDto>();
             foreach (var entity in entities)

@@ -30,21 +30,17 @@ namespace Boxty.ServerBase.Endpoints
                 [FromServices] IDbContext<TContext> dbContext,
                 [FromServices] IMapper<T, TDto> mapper,
                 [FromServices] BlobServiceClient blobServiceClient,
-                [FromServices] Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
                 [FromForm] TDto documentDto,
                 [FromForm] IFormFile file,
                 ClaimsPrincipal user
-            ) => await UploadDocument(dbContext, mapper, blobServiceClient, authorizationService, documentDto, file, user)).DisableAntiforgery();
+            ) => await UploadDocument(dbContext, mapper, blobServiceClient, documentDto, file, user)).DisableAntiforgery();
 
             group.MapGet("/getsaslink/{documentGuid}", async (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
                 [FromServices] BlobServiceClient blobServiceClient,
-                [FromServices] Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
                 [FromServices] IGetByIdQuery<T, TDto, TContext> getByIdQuery,
                 Guid documentGuid,
                 ClaimsPrincipal user
-            ) => await GetDocumentSasLink(getByIdQuery, blobServiceClient, authorizationService, documentGuid, user));
+            ) => await GetDocumentSasLink(getByIdQuery, blobServiceClient, documentGuid, user));
 
             return endpoints;
         }
@@ -54,7 +50,6 @@ namespace Boxty.ServerBase.Endpoints
             IDbContext<TContext> dbContext,
             IMapper<T, TDto> mapper,
             BlobServiceClient blobServiceClient,
-            Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
             TDto documentDto,
             IFormFile file,
             ClaimsPrincipal user)
@@ -62,7 +57,7 @@ namespace Boxty.ServerBase.Endpoints
             if (file == null || file.Length == 0)
                 return Results.BadRequest("File is required.");
 
-            try
+            return await Execute(async () =>
             {
                 var containerName = $"documents";
 
@@ -87,22 +82,16 @@ namespace Boxty.ServerBase.Endpoints
                 await dbContext.SaveChangesWithAuditAsync(user);
 
                 return Results.Ok(new { url = blobClient.Uri.ToString() });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem("An error occurred while uploading the document.");
-            }
+            }, "An error occurred while uploading the document.");
         }
 
         protected async Task<IResult> GetDocumentSasLink(
             IGetByIdQuery<T, TDto, TContext> getByIdQuery,
             BlobServiceClient blobServiceClient,
-            Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
             Guid documentGuid,
             ClaimsPrincipal user)
         {
-            try
+            return await Execute(async () =>
             {
                 // Retrieve the document entity from the database using the injected query handler
                 var document = await getByIdQuery.Handle(documentGuid, user);
@@ -115,12 +104,7 @@ namespace Boxty.ServerBase.Endpoints
                 var sasToken = blobClient.GenerateSasUri(BlobSasPermissions.Read, DateTimeOffset.UtcNow.AddHours(1));
 
                 return Results.Ok(sasToken.ToString());
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem("An error occurred while generating document access link.");
-            }
+            }, "An error occurred while generating document access link.");
         }
     }
 }
