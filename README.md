@@ -116,8 +116,8 @@ builder.Services.AddScoped<ICrudService<SubjectDocumentDto>, CrudService<Subject
 builder.Services.AddScoped<ICrudService<TenantNoteDto>, CrudService<TenantNoteDto>>();
 builder.Services.AddScoped<ICrudService<SubjectNoteDto>, CrudService<SubjectNoteDto>>();
 builder.Services.AddScoped<IDocumentUploadService, DocumentUploadService>();
+builder.Services.AddScoped<IUserClaimsReader, UserClaimsReader>();
 builder.Services.AddScoped<IAuthHelperService, AuthHelperService>();
-builder.Services.AddScoped<ILocalBackupService, LocalBackupService>();
 builder.Services.AddScoped<GlobalStateService>();
 builder.Services.AddScoped<IServerEventStreamClient, ServerEventStreamClient>();
 ```

@@ -1,7 +1,6 @@
 ﻿using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text.Json;
-using Blazored.LocalStorage;
 using MudBlazor;
 using Microsoft.AspNetCore.Components.Authorization;
 using Boxty.SharedBase.DTOs.Auth;
@@ -9,12 +8,6 @@ using Boxty.SharedBase.Interfaces;
 
 namespace Boxty.ClientBase.Services
 {
-    public class TenantSelectionDto
-    {
-        public Guid Id { get; set; }
-        public string Name { get; set; } = string.Empty;
-    }
-
     public interface IAuthHelperService
     {
         Task<string?> GetFullNameAsync();
@@ -22,9 +15,6 @@ namespace Boxty.ClientBase.Services
         Task<string?> GetUserNameAsync();
         Task<Guid?> GetSubjectIdAsync();
         Task<Guid?> GetTenantIdAsync();
-        Task<Guid?> GetActiveTenantIdAsync();
-        Task SetActiveTenantIdAsync(Guid? tenantId);
-        Task<IEnumerable<TenantSelectionDto>> GetAvailableTenantsAsync();
         Task<ClaimsPrincipal?> GetUserAsync();
         Task<TSubjectDto?> ResetSubjectPassword<TSubjectDto>(Guid id, CancellationToken token) where TSubjectDto : class, ISubject;
         Task<bool> IsAuthorizedForRoleManagement();
@@ -38,8 +28,6 @@ namespace Boxty.ClientBase.Services
         private readonly HttpClient _httpClient;
         private readonly ISnackbar _snackbar;
         private readonly GlobalStateService _globalStateService;
-        private readonly ILocalStorageService? _localStorageService;
-        private const string ActiveTenantStorageKey = "boxty.active.tenant.id";
 
         private static readonly JsonSerializerOptions JsonOptions = new JsonSerializerOptions
         {
@@ -47,17 +35,11 @@ namespace Boxty.ClientBase.Services
         };
 
         public AuthHelperService(AuthenticationStateProvider authenticationStateProvider, HttpClient httpClient, ISnackbar snackbar, GlobalStateService globalStateService)
-            : this(authenticationStateProvider, httpClient, snackbar, globalStateService, null)
-        {
-        }
-
-        public AuthHelperService(AuthenticationStateProvider authenticationStateProvider, HttpClient httpClient, ISnackbar snackbar, GlobalStateService globalStateService, ILocalStorageService? localStorageService)
         {
             _authenticationStateProvider = authenticationStateProvider;
             _httpClient = httpClient;
             _snackbar = snackbar;
             _globalStateService = globalStateService;
-            _localStorageService = localStorageService;
         }
         public async Task<ClaimsPrincipal?> GetUserAsync()
         {
@@ -68,7 +50,15 @@ namespace Boxty.ClientBase.Services
         public async Task<string?> GetFullNameAsync()
         {
             var user = await GetUserAsync();
-            return user?.FindFirst("name")?.Value;
+            if (user == null)
+            {
+                return null;
+            }
+
+            var firstName = user.FindFirst("given_name")?.Value ?? string.Empty;
+            var lastName = user.FindFirst("family_name")?.Value ?? string.Empty;
+            var fullName = $"{firstName} {lastName}".Trim();
+            return string.IsNullOrWhiteSpace(fullName) ? user.FindFirst("name")?.Value : fullName;
         }
 
         public async Task<string?> GetEmailAsync()
@@ -172,7 +162,9 @@ namespace Boxty.ClientBase.Services
             var user = await GetUserAsync();
             if (user == null) return false;
 
-            return user.IsInRole("administrator") || user.IsInRole("tenantadministrator");
+            var roles = GetRoles(user);
+            return roles.Contains("administrator", StringComparer.OrdinalIgnoreCase)
+                || roles.Contains("tenantadministrator", StringComparer.OrdinalIgnoreCase);
         }
 
         public async Task<bool> IsUserInRole(string role)
@@ -180,7 +172,7 @@ namespace Boxty.ClientBase.Services
             var user = await GetUserAsync();
             if (user == null) return false;
 
-            return user.IsInRole(role);
+            return GetRoles(user).Contains(role, StringComparer.OrdinalIgnoreCase);
         }
 
         public async Task<Guid?> GetSubjectIdAsync()
@@ -194,93 +186,72 @@ namespace Boxty.ClientBase.Services
 
         public async Task<Guid?> GetTenantIdAsync()
         {
-            var activeTenantId = await GetActiveTenantIdAsync();
-            if (activeTenantId.HasValue)
-            {
-                return activeTenantId;
-            }
-
-            var tenants = (await GetAvailableTenantsAsync()).ToList();
-            if (tenants.Count == 0)
+            var user = await GetUserAsync();
+            if (user == null)
             {
                 return null;
             }
 
-            var fallbackTenantId = tenants[0].Id;
-            await SetActiveTenantIdAsync(fallbackTenantId);
-            return fallbackTenantId;
+            var claimTenantId = GetOrganizations(user).FirstOrDefault()?.Id.ToString();
+            if (Guid.TryParse(claimTenantId, out var tenantId))
+            {
+                return tenantId;
+            }
+
+            return null;
         }
 
-        public async Task<Guid?> GetActiveTenantIdAsync()
+        public async Task<IEnumerable<RoleDto>> GetAllRolesAsync()
         {
-            if (_localStorageService == null)
+            return await _httpClient.GetFromJsonAsync<List<RoleDto>>("api/auth/roles/getall") ?? new();
+        }
+
+        private static List<string> GetRoles(ClaimsPrincipal user)
+        {
+            var roles = new HashSet<string>(user.FindAll("role").Select(claim => claim.Value), StringComparer.OrdinalIgnoreCase);
+
+            AddRolesFromClaim(user, roles, "realm_access", root =>
+                root.TryGetProperty("roles", out var realmRoles) && realmRoles.ValueKind == JsonValueKind.Array
+                    ? realmRoles.EnumerateArray().Select(role => role.GetString())
+                    : Enumerable.Empty<string?>());
+
+            AddRolesFromClaim(user, roles, "resource_access", root =>
+                root.ValueKind != JsonValueKind.Object
+                    ? Enumerable.Empty<string?>()
+                    : root.EnumerateObject()
+                        .Where(resource => resource.Value.TryGetProperty("roles", out var resourceRoles) && resourceRoles.ValueKind == JsonValueKind.Array)
+                        .SelectMany(resource => resource.Value.GetProperty("roles").EnumerateArray().Select(role => role.GetString())));
+
+            return roles.ToList();
+        }
+
+        private static IReadOnlyList<OrganizationInfo> GetOrganizations(ClaimsPrincipal user)
+        {
+            var organizations = new List<OrganizationInfo>();
+            var organizationClaim = user.FindFirst("organization")?.Value;
+
+            if (string.IsNullOrWhiteSpace(organizationClaim))
             {
-                return await GetClaimTenantIdAsync();
+                return organizations;
             }
 
             try
             {
-                var storedTenant = await _localStorageService.GetItemAsync<string>(ActiveTenantStorageKey);
-                if (Guid.TryParse(storedTenant, out var activeTenantId))
-                {
-                    var tenants = await GetAvailableTenantsAsync();
-                    if (tenants.Any(t => t.Id == activeTenantId))
-                    {
-                        return activeTenantId;
-                    }
-                }
-            }
-            catch
-            {
-            }
+                using var document = JsonDocument.Parse(organizationClaim);
+                var root = document.RootElement;
 
-            return await GetClaimTenantIdAsync();
-        }
-
-        public async Task SetActiveTenantIdAsync(Guid? tenantId)
-        {
-            if (_localStorageService == null)
-            {
-                return;
-            }
-
-            if (!tenantId.HasValue || tenantId.Value == Guid.Empty)
-            {
-                await _localStorageService.RemoveItemAsync(ActiveTenantStorageKey);
-                return;
-            }
-
-            await _localStorageService.SetItemAsync(ActiveTenantStorageKey, tenantId.Value.ToString());
-        }
-
-        public async Task<IEnumerable<TenantSelectionDto>> GetAvailableTenantsAsync()
-        {
-            var user = await GetUserAsync();
-            if (user == null) return [];
-
-            var orgClaim = user.FindFirst("organization")?.Value;
-            if (string.IsNullOrEmpty(orgClaim))
-                return [];
-
-            var tenants = new List<TenantSelectionDto>();
-
-            try
-            {
-                using var doc = JsonDocument.Parse(orgClaim);
-                var root = doc.RootElement;
-
-                if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
+                if (root.ValueKind == JsonValueKind.Array)
                 {
                     foreach (var item in root.EnumerateArray())
                     {
-                        AddTenantFromJsonElement(tenants, item);
+                        AddOrganization(organizations, item);
                     }
                 }
                 else if (root.ValueKind == JsonValueKind.Object)
                 {
                     if (root.TryGetProperty("id", out _))
                     {
-                        AddTenantFromJsonElement(tenants, root);
+                        AddOrganization(organizations, root);
                     }
                     else
                     {
@@ -288,44 +259,61 @@ namespace Boxty.ClientBase.Services
                         {
                             if (property.Value.ValueKind == JsonValueKind.Object)
                             {
-                                AddTenantFromJsonElement(tenants, property.Value, property.Name);
+                                AddOrganization(organizations, property.Value, property.Name);
                             }
                         }
                     }
                 }
             }
-            catch
+            catch (JsonException)
             {
+                return [];
             }
 
-            if (tenants.Count == 0 && (user.IsInRole("administrator") || user.IsInRole("tenantadministrator") || user.IsInRole("tenantlimitedadministrator")))
-            {
-                var tenantsFromApi = await GetTenantsFromApiAsync();
-                tenants.AddRange(tenantsFromApi);
-            }
-
-            return tenants
-                .Where(t => t.Id != Guid.Empty)
-                .GroupBy(t => t.Id)
-                .Select(g => g.First())
+            return organizations
+                .Where(organization => organization.Id != Guid.Empty)
+                .GroupBy(organization => organization.Id)
+                .Select(group => group.First())
                 .ToList();
         }
 
-        private async Task<Guid?> GetClaimTenantIdAsync()
+        private static void AddRolesFromClaim(
+            ClaimsPrincipal user,
+            ISet<string> roles,
+            string claimType,
+            Func<JsonElement, IEnumerable<string?>> extractor)
         {
-            var tenants = await GetAvailableTenantsAsync();
-            return tenants.FirstOrDefault()?.Id;
+            var claimValue = user.FindFirst(claimType)?.Value;
+            if (string.IsNullOrWhiteSpace(claimValue))
+            {
+                return;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(claimValue);
+                foreach (var role in extractor(document.RootElement))
+                {
+                    if (!string.IsNullOrWhiteSpace(role))
+                    {
+                        roles.Add(role);
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+            }
         }
 
-        private static void AddTenantFromJsonElement(List<TenantSelectionDto> tenants, JsonElement element, string? fallbackName = null)
+        private static void AddOrganization(List<OrganizationInfo> organizations, JsonElement element, string? fallbackName = null)
         {
             if (!element.TryGetProperty("id", out var idProperty))
             {
                 return;
             }
 
-            var idString = idProperty.GetString();
-            if (!Guid.TryParse(idString, out var tenantId))
+            var idValue = idProperty.GetString();
+            if (!Guid.TryParse(idValue, out var organizationId))
             {
                 return;
             }
@@ -335,80 +323,29 @@ namespace Boxty.ClientBase.Services
                 ?? GetStringProperty(element, "tenantName")
                 ?? GetStringProperty(element, "label")
                 ?? fallbackName
-                ?? tenantId.ToString();
+                ?? organizationId.ToString();
 
-            tenants.Add(new TenantSelectionDto
+            organizations.Add(new OrganizationInfo
             {
-                Id = tenantId,
+                Id = organizationId,
                 Name = name
             });
         }
 
         private static string? GetStringProperty(JsonElement element, string propertyName)
         {
-            if (!element.TryGetProperty(propertyName, out var property))
+            if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
             {
                 return null;
             }
 
-            return property.ValueKind == JsonValueKind.String
-                ? property.GetString()
-                : null;
+            return property.GetString();
         }
 
-        private async Task<IEnumerable<TenantSelectionDto>> GetTenantsFromApiAsync()
+        private sealed class OrganizationInfo
         {
-            try
-            {
-                using var response = await _httpClient.GetAsync("api/tenant/getall");
-                if (!response.IsSuccessStatusCode)
-                {
-                    return [];
-                }
-
-                var content = await response.Content.ReadAsStringAsync();
-                if (string.IsNullOrWhiteSpace(content))
-                {
-                    return [];
-                }
-
-                using var doc = JsonDocument.Parse(content);
-                if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                {
-                    return [];
-                }
-
-                var result = new List<TenantSelectionDto>();
-                foreach (var item in doc.RootElement.EnumerateArray())
-                {
-                    var id = GetStringProperty(item, "id") ?? GetStringProperty(item, "Id");
-                    if (!Guid.TryParse(id, out var tenantId))
-                    {
-                        continue;
-                    }
-
-                    var name = GetStringProperty(item, "name")
-                        ?? GetStringProperty(item, "Name")
-                        ?? tenantId.ToString();
-
-                    result.Add(new TenantSelectionDto
-                    {
-                        Id = tenantId,
-                        Name = name
-                    });
-                }
-
-                return result;
-            }
-            catch
-            {
-                return [];
-            }
-        }
-
-        public async Task<IEnumerable<RoleDto>> GetAllRolesAsync()
-        {
-            return await _httpClient.GetFromJsonAsync<List<RoleDto>>("api/auth/roles/getall") ?? new();
+            public Guid Id { get; init; }
+            public string Name { get; init; } = string.Empty;
         }
     }
 }

@@ -1,6 +1,7 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
-using Boxty.ServerBase.Auth.Endpoints;
+using Boxty.SharedBase.Helpers;
+using Boxty.SharedBase.Interfaces;
 using Boxty.ServerBase.Config;
 using Boxty.ServerBase.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -20,7 +21,6 @@ namespace Boxty.ServerBase.Modules
         public IServiceCollection RegisterModuleServices(IServiceCollection services, IConfiguration configuration)
         {
             services.Configure<AppOptions>(configuration);
-            services.AddSingleton<IKeycloakService, KeycloakService>();
 
             services.AddDatabaseDeveloperPageExceptionFilter();
             services.AddCors(options =>
@@ -77,8 +77,7 @@ namespace Boxty.ServerBase.Modules
             services.AddHttpClient();
 
             services.AddSingleton<IRolePermissionCacheService, RolePermissionCacheService>();
-            services.AddHostedService<RolePermissionCacheRefreshBackgroundService>();
-            services.AddScoped<IUserContextService, UserContextService>();
+            services.AddScoped<IUserClaimsReader, UserClaimsReader>();
 
             return services;
         }
@@ -110,10 +109,6 @@ namespace Boxty.ServerBase.Modules
             app.UseAuthorization();
             logger.LogDebug("Authentication and authorization configured");
 
-            logger.LogInformation("Initializing role permission cache...");
-            InitializeRolePermissionCache(app, logger).GetAwaiter().GetResult();
-            logger.LogInformation("Role permission cache initialized successfully");
-
             app.MapPost("/api/admin/permissions/refresh", async (IRolePermissionCacheService cacheService) =>
             {
                 await cacheService.InitAsync();
@@ -124,8 +119,6 @@ namespace Boxty.ServerBase.Modules
                 });
             })
             .RequireAuthorization(policy => policy.RequireRole("administrator"));
-
-            app.MapAuthManagementEndpoints();
 
             if (isDevelopment)
             {
@@ -142,26 +135,5 @@ namespace Boxty.ServerBase.Modules
             logger.LogInformation("Base module configuration completed");
             return app;
         }
-
-        private async Task InitializeRolePermissionCache(WebApplication app, ILogger<BaseModule> logger)
-        {
-            try
-            {
-                logger.LogDebug("Starting role permission cache initialization");
-
-                using var scope = app.Services.CreateScope();
-                var cacheService = scope.ServiceProvider.GetRequiredService<IRolePermissionCacheService>();
-
-                logger.LogDebug("Role permission cache service resolved, invoking initialization");
-                await cacheService.InitAsync();
-
-                logger.LogInformation("Role permission cache initialized successfully");
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Failed to initialize role permission cache");
-            }
-        }
-
     }
 }

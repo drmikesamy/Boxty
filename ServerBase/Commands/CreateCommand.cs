@@ -2,7 +2,6 @@
 using Boxty.ServerBase.Auth.Constants;
 using Boxty.ServerBase.Database;
 using Boxty.ServerBase.Entities;
-using Boxty.ServerBase.Helpers;
 using Boxty.ServerBase.Interfaces;
 using Boxty.ServerBase.Mappers;
 using Boxty.SharedBase.DTOs;

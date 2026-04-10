@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<PackageId>Boxty.ServerBase</PackageId>
-    <Version>1.0.2</Version>
+		<Version>1.0.3</Version>
     <Authors>Mike Samy</Authors>
     <Company>Boxty.org</Company>
     <PackageTags>Boxty;ServerBase;ASP.NET Core;Multi-tenant;Keycloak</PackageTags>
@@ -22,7 +22,7 @@
     	<PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.6.0" />
 		<PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.2" />
 		<PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
-		<PackageReference Include="MailKit" Version="4.9.0" />
+		<PackageReference Include="MailKit" Version="4.15.1" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.3" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.3" />
 		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.3" />
@@ -36,7 +36,6 @@
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.3" />
-		<PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="9.0.0" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
 		<PackageReference Include="Scalar.AspNetCore" Version="2.1.1" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />

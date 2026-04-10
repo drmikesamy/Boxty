@@ -39,7 +39,7 @@ namespace Boxty.ServerBase.Tests.Commands
             // Arrange
             var entityId = Guid.NewGuid();
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync((TestEntity?)null);
 
             // Act
@@ -57,7 +57,7 @@ namespace Boxty.ServerBase.Tests.Commands
             var entityId = Guid.NewGuid();
             var entity = new TestEntity { Id = entityId };
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync(entity);
             
             _mockAuthService.Setup(a => a.AuthorizeAsync(_user, entity, "resource-access"))
@@ -80,13 +80,13 @@ namespace Boxty.ServerBase.Tests.Commands
             var entityId = Guid.NewGuid();
             var entity = new TestEntity { Id = entityId };
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync(entity);
             
             _mockAuthService.Setup(a => a.AuthorizeAsync(_user, entity, "resource-access"))
                 .ReturnsAsync(AuthorizationResult.Success());
             
-            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, default))
+            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, CancellationToken.None))
                 .ReturnsAsync(1);
 
             // Act
@@ -95,7 +95,7 @@ namespace Boxty.ServerBase.Tests.Commands
             // Assert
             result.Should().BeTrue();
             _mockDbSet.Verify(db => db.Remove(entity), Times.Once);
-            _mockDbContext.Verify(db => db.SaveChangesWithAuditAsync(_user, default), Times.Once);
+            _mockDbContext.Verify(db => db.SaveChangesWithAuditAsync(_user, CancellationToken.None), Times.Once);
         }
 
         [Fact]
@@ -105,13 +105,13 @@ namespace Boxty.ServerBase.Tests.Commands
             var entityId = Guid.NewGuid();
             var entity = new TestEntity { Id = entityId };
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync(entity);
             
             _mockAuthService.Setup(a => a.AuthorizeAsync(_user, entity, "resource-access"))
                 .ReturnsAsync(AuthorizationResult.Success());
             
-            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, default))
+            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, CancellationToken.None))
                 .ReturnsAsync(1);
 
             // Act
@@ -128,7 +128,7 @@ namespace Boxty.ServerBase.Tests.Commands
             var entityId = Guid.NewGuid();
             var entity = new TestEntity { Id = entityId };
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync(entity);
             
             _mockAuthService.Setup(a => a.AuthorizeAsync(_user, entity, "resource-access"))
@@ -138,7 +138,7 @@ namespace Boxty.ServerBase.Tests.Commands
             await _command.Handle(entityId, _user);
 
             // Assert
-            _mockDbSet.Verify(db => db.FindAsync(entityId), Times.Once);
+            _mockDbSet.Verify(db => db.FindAsync(new object[] { entityId }, CancellationToken.None), Times.Once);
         }
 
         [Fact]
@@ -148,7 +148,7 @@ namespace Boxty.ServerBase.Tests.Commands
             var entityId = Guid.NewGuid();
             var entity = new TestEntity { Id = entityId };
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync(entity);
             
             _mockAuthService.Setup(a => a.AuthorizeAsync(_user, entity, "resource-access"))
@@ -169,7 +169,7 @@ namespace Boxty.ServerBase.Tests.Commands
             // Arrange
             var entityId = Guid.NewGuid();
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync((TestEntity?)null);
 
             // Act
@@ -189,7 +189,7 @@ namespace Boxty.ServerBase.Tests.Commands
             // Arrange
             var entityId = Guid.Parse(guidString);
             
-            _mockDbSet.Setup(db => db.FindAsync(entityId))
+            _mockDbSet.Setup(db => db.FindAsync(new object[] { entityId }, CancellationToken.None))
                 .ReturnsAsync((TestEntity?)null);
 
             // Act

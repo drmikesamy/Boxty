@@ -1,8 +1,7 @@
 ﻿using System.Security.Claims;
-using System.Text.Json;
 using Boxty.ServerBase.Auth.Requirements;
 using Boxty.ServerBase.Entities;
-using Boxty.ServerBase.Helpers;
+using Boxty.SharedBase.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Boxty.ServerBase.Auth.AuthorizationHandlers
@@ -10,6 +9,13 @@ namespace Boxty.ServerBase.Auth.AuthorizationHandlers
     public class ResourceAccessAuthorizationHandler :
         AuthorizationHandler<ResourceAccessRequirement, IEntity>
     {
+        private readonly IUserClaimsReader _userClaimsReader;
+
+        public ResourceAccessAuthorizationHandler(IUserClaimsReader userClaimsReader)
+        {
+            _userClaimsReader = userClaimsReader;
+        }
+
         protected override Task HandleRequirementAsync(
             AuthorizationHandlerContext context,
             ResourceAccessRequirement requirement,
@@ -22,7 +28,7 @@ namespace Boxty.ServerBase.Auth.AuthorizationHandlers
             }
             else if (context.User.IsInRole("tenantadministrator"))
             {
-                var userTenantId = context.User.GetUserTenantId();
+                var userTenantId = _userClaimsReader.GetOrganizationId(context.User);
                 if (!string.IsNullOrEmpty(userTenantId)
                 && (resource.TenantId == Guid.Parse(userTenantId) || resource.Id == Guid.Parse(userTenantId)))
                 {

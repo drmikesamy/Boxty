@@ -6,6 +6,7 @@ set -e
 # Get the script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 NUPKGS_DIR="$SCRIPT_DIR/nupkgs"
+DEMO_NUPKGS_DIR="$SCRIPT_DIR/../BoxtyDemo/nupkgs"
 
 # Create nupkgs directory if it doesn't exist
 mkdir -p "$NUPKGS_DIR"
@@ -41,6 +42,13 @@ dotnet pack "$SCRIPT_DIR/ClientBase/Boxty.ClientBase.csproj" \
 echo ""
 echo "✅ All packages packed successfully!"
 echo "📍 Packages are in: $NUPKGS_DIR"
+
+if [ -d "$DEMO_NUPKGS_DIR" ]; then
+    echo "📦 Syncing packages to demo feed: $DEMO_NUPKGS_DIR"
+    cp -f "$NUPKGS_DIR"/*.nupkg "$DEMO_NUPKGS_DIR"/ 2>/dev/null || true
+    cp -f "$NUPKGS_DIR"/*.snupkg "$DEMO_NUPKGS_DIR"/ 2>/dev/null || true
+fi
+
 echo ""
 echo "To use in your demo project:"
 echo "1. Add this to your demo project's NuGet.config:"

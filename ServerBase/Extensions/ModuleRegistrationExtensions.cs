@@ -21,31 +21,15 @@ namespace Boxty.ServerBase.Extensions
 {
     public static class ModuleRegistrationExtensions
     {
+        private const string SharedAssemblyName = "Boxty.SharedApp";
+
         public static IServiceCollection RegisterServices(this IServiceCollection services, IConfiguration configuration, ref List<Type> moduleTypes, out List<IModule> registeredModules)
         {
             var mapperInterfaceType = typeof(IMapper<,>);
 
             registeredModules = new List<IModule>();
 
-            // Register open generic query/command handlers for all modules
-            services.AddScoped(typeof(IGetAllQuery<,,>), typeof(GetAllQuery<,,>));
-            services.AddScoped(typeof(IGetByIdQuery<,,>), typeof(GetByIdQuery<,,>));
-            services.AddScoped(typeof(IGetByIdsQuery<,,>), typeof(GetByIdsQuery<,,>));
-            services.AddScoped(typeof(IGetPagedQuery<,,>), typeof(GetPagedQuery<,,>));
-            services.AddScoped(typeof(ISearchQuery<,,>), typeof(SearchQuery<,,>));
-            services.AddScoped(typeof(ICreateCommand<,,>), typeof(CreateCommand<,,>));
-            services.AddScoped(typeof(IUpdateCommand<,,>), typeof(UpdateCommand<,,>));
-            services.AddScoped(typeof(IDeleteCommand<,>), typeof(DeleteCommand<,>));
-            services.AddScoped(typeof(ICreateSubjectCommand<,,>), typeof(CreateSubjectCommand<,,>));
-            services.AddScoped(typeof(ICreateTenantCommand<,,>), typeof(CreateTenantCommand<,,>));
-            services.AddScoped(typeof(IResetPasswordCommand<,,>), typeof(ResetPasswordCommand<,,>));
-            services.AddScoped(typeof(IDeleteTenantCommand<,,>), typeof(DeleteTenantCommand<,,>));
-            services.AddScoped(typeof(IDeleteSubjectCommand<,,>), typeof(DeleteSubjectCommand<,,>));
-            services.AddScoped<IGetAllRolesWithPermissionsQuery, GetAllRolesWithPermissionsFromKeycloakQuery>();
-            services.AddScoped(typeof(ISendEmailCommand), typeof(SendEmailCommand));
-            services.AddScoped(typeof(IEmailService), typeof(EmailService));
-            services.AddScoped<IGetSubjectByIdQuery, GetSubjectByIdQuery>();
-            services.AddScoped<IGetTenantByIdQuery, GetTenantByIdQuery>();
+            RegisterGenericServices(services);
 
             var baseModule = new BaseModule();
             baseModule.RegisterModuleServices(services, configuration);
@@ -53,49 +37,18 @@ namespace Boxty.ServerBase.Extensions
 
             foreach (var moduleType in moduleTypes)
             {
-                //Create the module and register the module services
-                var module = Activator.CreateInstance(moduleType) as IModule;
-                if (module == null)
-                {
-                    throw new InvalidOperationException($"Module type {moduleType.Name} does not implement IModule interface.");
-                }
+                var module = CreateModule(moduleType);
                 module.RegisterModuleServices(services, configuration);
                 registeredModules.Add(module);
 
-                //Register mappers & validators for each module
-                var mapperTypes = moduleType.Assembly.GetTypes()
-                    .Where(t => t.IsClass && !t.IsAbstract && t.GetInterfaces()
-                        .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == mapperInterfaceType))
-                    .ToList();
-
-                foreach (var mapperType in mapperTypes)
-                {
-                    var interfaceType = mapperType.GetInterfaces()
-                        .First(i => i.IsGenericType && i.GetGenericTypeDefinition() == mapperInterfaceType);
-                    services.AddTransient(interfaceType, mapperType);
-                }
+                RegisterModuleMappers(services, moduleType.Assembly, mapperInterfaceType);
             }
 
             services.AddScoped<IAuthorizationHandler, ResourceAccessAuthorizationHandler>();
             services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
             ResourceAccessPolicyRegistry.AddRequirement(new ResourceAccessRequirement());
 
-            foreach (var moduleType in moduleTypes)
-            {
-                try
-                {
-                    var sharedAssemblyName = "Boxty.SharedApp";
-                    if (!string.IsNullOrEmpty(sharedAssemblyName))
-                    {
-                        var moduleSharedAssembly = Assembly.Load(sharedAssemblyName);
-                        services.AddValidatorsFromAssembly(moduleSharedAssembly);
-                    }
-                }
-                catch (Exception)
-                {
-                    // Assembly doesn't exist or couldn't be loaded, skip
-                }
-            }
+            TryRegisterSharedValidators(services);
 
             services.AddAuthorization(options =>
             {
@@ -109,8 +62,7 @@ namespace Boxty.ServerBase.Extensions
         {
             ValidatePermissionProviderRegistration(app.Services);
 
-            var loggerFactory = app.Services.GetRequiredService<ILoggerFactory>();
-            var logger = loggerFactory.CreateLogger("ModuleRegistration");
+            var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("ModuleRegistration");
             logger.LogInformation("Configuring {ModuleCount} modules and mapping endpoints...", registeredModules.Count);
 
             foreach (var module in registeredModules)
@@ -120,23 +72,15 @@ namespace Boxty.ServerBase.Extensions
 
                 module.ConfigureModuleServices(app, isDevelopment);
 
-                if (module.GetType().Name == "BaseModule")
+                if (moduleName == nameof(BaseModule))
                 {
                     continue;
                 }
 
                 try
                 {
-                    var endpointAssemblyName = $"Boxty.ServerApp.Modules.{module.GetType().Name.Replace("Module", "")}.Endpoints";
-                    var endpointAssembly = Assembly.Load(endpointAssemblyName);
-
-                    var endpointTypes = endpointAssembly.GetTypes()
-                                                    .Where(x => x.IsAssignableTo(typeof(IEndpoints)) && x.IsClass)
-                                                    .Select(Activator.CreateInstance)
-                                                    .Cast<IEndpoints>();
-
                     var endpointCount = 0;
-                    foreach (var endpointType in endpointTypes)
+                    foreach (var endpointType in LoadEndpointInstances(moduleName))
                     {
                         endpointType.MapEndpoints(app);
                         endpointCount++;
@@ -149,6 +93,8 @@ namespace Boxty.ServerBase.Extensions
                     logger.LogWarning(ex, "Failed to load endpoints for module {ModuleName}", moduleName);
                 }
             }
+
+            InitializeRolePermissionCache(app, logger).GetAwaiter().GetResult();
 
             logger.LogInformation("Module configuration and endpoint mapping completed");
             return app;
@@ -171,6 +117,87 @@ namespace Boxty.ServerBase.Extensions
                 throw new InvalidOperationException(
                     $"Multiple IGetAllRolesWithPermissionsQuery implementations registered ({permissionQueries.Count}). " +
                     "Register exactly one permission provider.");
+            }
+        }
+
+        private static void RegisterGenericServices(IServiceCollection services)
+        {
+            services.AddScoped(typeof(IGetAllQuery<,,>), typeof(GetAllQuery<,,>));
+            services.AddScoped(typeof(IGetByIdQuery<,,>), typeof(GetByIdQuery<,,>));
+            services.AddScoped(typeof(IGetByIdsQuery<,,>), typeof(GetByIdsQuery<,,>));
+            services.AddScoped(typeof(IGetPagedQuery<,,>), typeof(GetPagedQuery<,,>));
+            services.AddScoped(typeof(ISearchQuery<,,>), typeof(SearchQuery<,,>));
+            services.AddScoped(typeof(ICreateCommand<,,>), typeof(CreateCommand<,,>));
+            services.AddScoped(typeof(IUpdateCommand<,,>), typeof(UpdateCommand<,,>));
+            services.AddScoped(typeof(IDeleteCommand<,>), typeof(DeleteCommand<,>));
+            services.AddScoped(typeof(ISendEmailCommand), typeof(SendEmailCommand));
+            services.AddScoped(typeof(IEmailService), typeof(EmailService));
+        }
+
+        private static IModule CreateModule(Type moduleType)
+        {
+            var module = Activator.CreateInstance(moduleType) as IModule;
+            if (module == null)
+            {
+                throw new InvalidOperationException($"Module type {moduleType.Name} does not implement IModule interface.");
+            }
+
+            return module;
+        }
+
+        private static void RegisterModuleMappers(IServiceCollection services, Assembly assembly, Type mapperInterfaceType)
+        {
+            var mapperTypes = assembly.GetTypes()
+                .Where(type => type.IsClass && !type.IsAbstract && type.GetInterfaces()
+                    .Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == mapperInterfaceType));
+
+            foreach (var mapperType in mapperTypes)
+            {
+                var interfaceType = mapperType.GetInterfaces()
+                    .First(i => i.IsGenericType && i.GetGenericTypeDefinition() == mapperInterfaceType);
+                services.AddTransient(interfaceType, mapperType);
+            }
+        }
+
+        private static void TryRegisterSharedValidators(IServiceCollection services)
+        {
+            try
+            {
+                var sharedAssembly = Assembly.Load(SharedAssemblyName);
+                services.AddValidatorsFromAssembly(sharedAssembly);
+            }
+            catch (Exception)
+            {
+                // Assembly doesn't exist or couldn't be loaded, skip
+            }
+        }
+
+        private static IEnumerable<IEndpoints> LoadEndpointInstances(string moduleName)
+        {
+            var endpointAssemblyName = $"Boxty.ServerApp.Modules.{moduleName.Replace("Module", string.Empty)}.Endpoints";
+            var endpointAssembly = Assembly.Load(endpointAssemblyName);
+
+            return endpointAssembly.GetTypes()
+                .Where(type => type.IsAssignableTo(typeof(IEndpoints)) && type.IsClass)
+                .Select(Activator.CreateInstance)
+                .Cast<IEndpoints>();
+        }
+
+        private static async Task InitializeRolePermissionCache(WebApplication app, ILogger logger)
+        {
+            try
+            {
+                logger.LogInformation("Initializing role permission cache after module configuration...");
+
+                using var scope = app.Services.CreateScope();
+                var cacheService = scope.ServiceProvider.GetRequiredService<IRolePermissionCacheService>();
+                await cacheService.InitAsync();
+
+                logger.LogInformation("Role permission cache initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to initialize role permission cache after module configuration");
             }
         }
     }
