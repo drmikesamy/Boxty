@@ -7,6 +7,7 @@ using Boxty.ServerBase.Mappers;
 using Boxty.SharedBase.DTOs;
 using Boxty.SharedBase.Interfaces;
 using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 namespace Boxty.ServerBase.Commands
@@ -44,6 +45,26 @@ namespace Boxty.ServerBase.Commands
             if (dto == null)
                 throw new ArgumentNullException(nameof(dto));
 
+            if (!skipAuth)
+            {
+                var createEntityAuthorizationResult = await _authorizationService.AuthorizeAsync(user, dto, "create-entity");
+                if (!createEntityAuthorizationResult.Succeeded)
+                {
+                    var errors = createEntityAuthorizationResult.Failure?.FailureReasons
+                        .Select(reason => ParseFailureReason(reason.Message))
+                        .Where(reason => reason != null)
+                        .Select(reason => reason!.Value)
+                        .ToList();
+
+                    if (errors != null && errors.Any())
+                    {
+                        throw new ValidationException(errors.Select(error => new ValidationFailure(error.Property, error.Message)));
+                    }
+
+                    throw new UnauthorizedAccessException("Authorization failed for create-entity policy.");
+                }
+            }
+
             // 1. Validate DTO using FluentValidation
             var validationResult = await _validator.ValidateAsync(dto);
 
@@ -70,6 +91,22 @@ namespace Boxty.ServerBase.Commands
 
             await _dbContext.SaveChangesWithAuditAsync(user);
             return newEntity.Id;
+        }
+
+        private static (string Property, string Message)? ParseFailureReason(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return null;
+            }
+
+            var separatorIndex = message.IndexOf('|');
+            if (separatorIndex <= 0 || separatorIndex == message.Length - 1)
+            {
+                return ("Authorization", message);
+            }
+
+            return (message[..separatorIndex], message[(separatorIndex + 1)..]);
         }
     }
 }
