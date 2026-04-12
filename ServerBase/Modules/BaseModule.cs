@@ -1,16 +1,19 @@
 ﻿using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
+using Boxty.SharedBase.Helpers;
+using Boxty.SharedBase.Interfaces;
 using Boxty.ServerBase.Config;
 using Boxty.ServerBase.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
-using System.Reflection;
 
 namespace Boxty.ServerBase.Modules
 {
@@ -19,9 +22,13 @@ namespace Boxty.ServerBase.Modules
         public IServiceCollection RegisterModuleServices(IServiceCollection services, IConfiguration configuration)
         {
             services.Configure<AppOptions>(configuration);
-            services.AddSingleton<IKeycloakService, KeycloakService>();
 
-            services.AddDatabaseDeveloperPageExceptionFilter();
+            var environmentName = configuration["ASPNETCORE_ENVIRONMENT"] ?? configuration["DOTNET_ENVIRONMENT"];
+            if (string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase))
+            {
+                services.AddDatabaseDeveloperPageExceptionFilter();
+            }
+
             services.AddCors(options =>
             {
                 options.AddPolicy("Client",
@@ -76,7 +83,7 @@ namespace Boxty.ServerBase.Modules
             services.AddHttpClient();
 
             services.AddSingleton<IRolePermissionCacheService, RolePermissionCacheService>();
-            services.AddScoped<IUserContextService, UserContextService>();
+            services.AddScoped<IUserClaimsReader, UserClaimsReader>();
 
             return services;
         }
@@ -108,10 +115,6 @@ namespace Boxty.ServerBase.Modules
             app.UseAuthorization();
             logger.LogDebug("Authentication and authorization configured");
 
-            logger.LogInformation("Initializing role permission cache...");
-            InitializeRolePermissionCache(app).GetAwaiter().GetResult();
-            logger.LogInformation("Role permission cache initialized successfully");
-
             if (isDevelopment)
             {
                 app.MapOpenApi();
@@ -127,27 +130,5 @@ namespace Boxty.ServerBase.Modules
             logger.LogInformation("Base module configuration completed");
             return app;
         }
-
-        private async Task InitializeRolePermissionCache(WebApplication app)
-        {
-            try
-            {
-                Console.WriteLine("Starting role permission cache initialization...");
-
-                using var scope = app.Services.CreateScope();
-                var cacheService = scope.ServiceProvider.GetRequiredService<IRolePermissionCacheService>();
-
-                Console.WriteLine("Cache service obtained, calling InitAsync...");
-                await cacheService.InitAsync();
-
-                Console.WriteLine("Role permission cache initialized successfully with!");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Failed to initialize role permission cache: {ex.Message}");
-                Console.WriteLine($"Exception details: {ex}");
-            }
-        }
-
     }
 }

@@ -4,7 +4,6 @@ using Boxty.ServerBase.Commands;
 using Boxty.ServerBase.Database;
 using Boxty.ServerBase.Entities;
 using Boxty.ServerBase.Interfaces;
-using Boxty.ServerBase.Mappers;
 using Boxty.ServerBase.Queries;
 using Boxty.SharedBase.DTOs;
 using Boxty.SharedBase.Interfaces;
@@ -41,9 +40,7 @@ namespace Boxty.ServerBase.Endpoints
             var viewPermission = PermissionHelper.GeneratePermission<T>(PermissionOperations.View);
 
             group.MapGet("/GetAll", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetAllQuery<T, TDto, TContext> getAllQuery,
+                [FromServices] IGetAllQuery<T, TDto, TContext> getAllQuery,
                 ClaimsPrincipal user,
                 [FromQuery] Guid? tenantId = null,
                 [FromQuery] Guid? subjectId = null
@@ -51,9 +48,7 @@ namespace Boxty.ServerBase.Endpoints
             .RequireAuthorization($"Permission:{viewPermission}");
 
             group.MapGet("/GetById/{id}", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetByIdQuery<T, TDto, TContext> getByIdQuery,
+                [FromServices] IGetByIdQuery<T, TDto, TContext> getByIdQuery,
                 ClaimsPrincipal user,
                 Guid id,
                 [FromQuery] Guid? tenantId = null,
@@ -62,9 +57,7 @@ namespace Boxty.ServerBase.Endpoints
             .RequireAuthorization($"Permission:{viewPermission}");
 
             group.MapPost("/GetByIds", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetByIdsQuery<T, TDto, TContext> getByIdsQuery,
+                [FromServices] IGetByIdsQuery<T, TDto, TContext> getByIdsQuery,
                 ClaimsPrincipal user,
                 List<Guid> ids,
                 [FromQuery] Guid? tenantId = null,
@@ -73,9 +66,7 @@ namespace Boxty.ServerBase.Endpoints
             .RequireAuthorization($"Permission:{viewPermission}");
 
             group.MapGet("/Search", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] SearchQuery<T, TDto, TContext> searchQuery,
+                [FromServices] ISearchQuery<T, TDto, TContext> searchQuery,
                 ClaimsPrincipal user,
                 [FromQuery] string term,
                 [FromQuery] Guid? tenantId = null,
@@ -84,9 +75,7 @@ namespace Boxty.ServerBase.Endpoints
             .RequireAuthorization($"Permission:{viewPermission}");
 
             group.MapGet("/Paged", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] GetPagedQuery<T, TDto, TContext> getPagedQuery,
+                [FromServices] IGetPagedQuery<T, TDto, TContext> getPagedQuery,
                 ClaimsPrincipal user,
                 [FromQuery] int page = 1,
                 [FromQuery] int pageSize = 10,
@@ -115,9 +104,7 @@ namespace Boxty.ServerBase.Endpoints
             var createPermission = PermissionHelper.GeneratePermission<T>(PermissionOperations.Create);
 
             group.MapPost("/Create", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] CreateCommand<T, TDto, TContext> createCommand,
+                [FromServices] ICreateCommand<T, TDto, TContext> createCommand,
                 [FromServices] IServiceProvider serviceProvider,
                 ClaimsPrincipal user,
                 TDto dto
@@ -131,9 +118,7 @@ namespace Boxty.ServerBase.Endpoints
             var updatePermission = PermissionHelper.GeneratePermission<T>(PermissionOperations.Update);
 
             group.MapPut("/Update", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] UpdateCommand<T, TDto, TContext> updateCommand,
+                [FromServices] IUpdateCommand<T, TDto, TContext> updateCommand,
                 [FromServices] IServiceProvider serviceProvider,
                 ClaimsPrincipal user,
                 TDto dto
@@ -147,9 +132,7 @@ namespace Boxty.ServerBase.Endpoints
             var deletePermission = PermissionHelper.GeneratePermission<T>(PermissionOperations.Delete);
 
             group.MapDelete("/Delete/{id}", (
-                [FromServices] IDbContext<TContext> dbContext,
-                [FromServices] IMapper<T, TDto> mapper,
-                [FromServices] DeleteCommand<T, TContext> deleteCommand,
+                [FromServices] IDeleteCommand<T, TContext> deleteCommand,
                 [FromServices] IServiceProvider serviceProvider,
                 ClaimsPrincipal user,
                 Guid id
@@ -157,57 +140,36 @@ namespace Boxty.ServerBase.Endpoints
             .RequireAuthorization($"Permission:{deletePermission}");
         }
 
-        protected async Task<IResult> GetAll(GetAllQuery<T, TDto, TContext> getAllQuery, ClaimsPrincipal user, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetAll(IGetAllQuery<T, TDto, TContext> getAllQuery, ClaimsPrincipal user, Guid? tenantId, Guid? subjectId)
         {
-            try
+            return await Execute(async () =>
             {
                 var allEntities = await getAllQuery.Handle(user, tenantId, subjectId);
-                if (allEntities == null || !allEntities.Any())
-                    return Results.NoContent();
-                return Results.Ok(allEntities);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while retrieving {typeof(T).Name} entities.");
-            }
+                return ToCollectionResult(allEntities);
+            }, $"An error occurred while retrieving {typeof(T).Name} entities.");
         }
 
-        protected async Task<IResult> GetById(GetByIdQuery<T, TDto, TContext> getByIdQuery, ClaimsPrincipal user, Guid id, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetById(IGetByIdQuery<T, TDto, TContext> getByIdQuery, ClaimsPrincipal user, Guid id, Guid? tenantId, Guid? subjectId)
         {
-            try
+            return await Execute(async () =>
             {
                 var entity = await getByIdQuery.Handle(id, user, tenantId, subjectId);
-                if (entity == null)
-                    return Results.NoContent();
-                return Results.Ok(entity);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while retrieving the {typeof(T).Name} details.");
-            }
+                return entity == null ? Results.NoContent() : Results.Ok(entity);
+            }, $"An error occurred while retrieving the {typeof(T).Name} details.");
         }
 
-        protected async Task<IResult> GetByIds(GetByIdsQuery<T, TDto, TContext> getByIdsQuery, ClaimsPrincipal user, List<Guid> ids, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetByIds(IGetByIdsQuery<T, TDto, TContext> getByIdsQuery, ClaimsPrincipal user, List<Guid> ids, Guid? tenantId, Guid? subjectId)
         {
-            try
+            return await Execute(async () =>
             {
                 var entities = await getByIdsQuery.Handle(ids, user, tenantId, subjectId);
-                if (entities == null || !entities.Any())
-                    return Results.NoContent();
-                return Results.Ok(entities);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while retrieving the {typeof(T).Name} entities.");
-            }
+                return ToCollectionResult(entities);
+            }, $"An error occurred while retrieving {typeof(T).Name} entities.");
         }
 
-        protected async Task<IResult> GetPaged(GetPagedQuery<T, TDto, TContext> getPagedQuery, ClaimsPrincipal user, int page, int pageSize, FetchFilter? filter, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> GetPaged(IGetPagedQuery<T, TDto, TContext> getPagedQuery, ClaimsPrincipal user, int page, int pageSize, FetchFilter? filter, Guid? tenantId, Guid? subjectId)
         {
-            try
+            return await Execute(async () =>
             {
                 // Only pass the filter if TDto implements IAutoCrud
                 PagedResult<TDto> pagedResult;
@@ -228,108 +190,105 @@ namespace Boxty.ServerBase.Endpoints
                     pagedResult = await getPagedQuery.Handle(page, pageSize, user, basicFilter, tenantId, subjectId);
                 }
 
-                if (pagedResult.Items == null || !pagedResult.Items.Any())
-                    return Results.NoContent();
-                return Results.Ok(pagedResult);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while retrieving the {typeof(T).Name} entities.");
-            }
+                return pagedResult.Items == null || !pagedResult.Items.Any()
+                    ? Results.NoContent()
+                    : Results.Ok(pagedResult);
+            }, $"An error occurred while retrieving {typeof(T).Name} entities.");
         }
 
-        protected async Task<IResult> Search(SearchQuery<T, TDto, TContext> searchQuery, ClaimsPrincipal user, string term, Guid? tenantId, Guid? subjectId)
+        protected async Task<IResult> Search(ISearchQuery<T, TDto, TContext> searchQuery, ClaimsPrincipal user, string term, Guid? tenantId, Guid? subjectId)
         {
-            try
+            return await Execute(async () =>
             {
                 var results = await searchQuery.Handle(user, term, tenantId, subjectId);
-                if (results == null || !results.Any())
-                    return Results.NoContent();
-                return Results.Ok(results);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while searching for {typeof(T).Name} entities.");
-            }
+                return ToCollectionResult(results);
+            }, $"An error occurred while searching for {typeof(T).Name} entities.");
         }
 
-        protected virtual async Task<IResult> Create(CreateCommand<T, TDto, TContext> createCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
+        protected virtual async Task<IResult> Create(ICreateCommand<T, TDto, TContext> createCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
         {
-            try
+            return await ExecuteWithValidation(async () =>
             {
                 await OnBeforeCreate(user, dto, serviceProvider);
                 var result = await createCommand.Handle(dto, user);
                 await OnAfterCreate(result, user, dto, serviceProvider);
                 return Results.Ok(result);
-            }
-            catch (ValidationException validationEx)
-            {
-                // Return validation errors as a structured response
-                var errors = validationEx.Errors.Select(e => new
-                {
-                    Property = e.PropertyName,
-                    Message = e.ErrorMessage
-                });
-                return Results.BadRequest(new
-                {
-                    message = "Validation failed",
-                    errors = errors
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while creating the {typeof(T).Name}.");
-            }
+            }, $"An error occurred while creating the {typeof(T).Name}.");
         }
 
-        protected virtual async Task<IResult> Update(UpdateCommand<T, TDto, TContext> updateCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
+        protected virtual async Task<IResult> Update(IUpdateCommand<T, TDto, TContext> updateCommand, ClaimsPrincipal user, TDto dto, IServiceProvider serviceProvider)
         {
-            try
+            return await ExecuteWithValidation(async () =>
             {
                 await OnBeforeUpdate(user, dto, serviceProvider);
                 var result = await updateCommand.Handle(dto, user);
                 await OnAfterUpdate(result, user, dto, serviceProvider);
                 return Results.Ok(result);
-            }
-            catch (ValidationException validationEx)
-            {
-                // Return validation errors as a structured response
-                var errors = validationEx.Errors.Select(e => new
-                {
-                    Property = e.PropertyName,
-                    Message = e.ErrorMessage
-                });
-                return Results.BadRequest(new
-                {
-                    message = "Validation failed",
-                    errors = errors
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while updating the {typeof(T).Name}.");
-            }
+            }, $"An error occurred while updating the {typeof(T).Name}.");
         }
 
-        protected async Task<IResult> Delete(DeleteCommand<T, TContext> deleteCommand, ClaimsPrincipal user, Guid id, IServiceProvider serviceProvider)
+        protected async Task<IResult> Delete(IDeleteCommand<T, TContext> deleteCommand, ClaimsPrincipal user, Guid id, IServiceProvider serviceProvider)
         {
-            try
+            return await Execute(async () =>
             {
                 await OnBeforeDelete(id, user, serviceProvider);
                 var result = await deleteCommand.Handle(id, user);
                 await OnAfterDelete(id, user, serviceProvider);
                 return Results.Ok(result);
-            }
-            catch (Exception ex)
+            }, $"An error occurred while deleting the {typeof(T).Name}.");
+        }
+
+        protected Task<IResult> Execute(Func<Task<IResult>> action, string errorMessage)
+        {
+            return ExecuteWithHandlers(action, errorMessage);
+        }
+
+        protected Task<IResult> ExecuteWithValidation(Func<Task<IResult>> action, string errorMessage)
+        {
+            return ExecuteWithHandlers(action, errorMessage, HandleValidationException);
+        }
+
+        protected IResult ToCollectionResult<TItem>(IEnumerable<TItem>? items)
+        {
+            return items == null || !items.Any()
+                ? Results.NoContent()
+                : Results.Ok(items);
+        }
+
+        private async Task<IResult> ExecuteWithHandlers(
+            Func<Task<IResult>> action,
+            string errorMessage,
+            Func<ValidationException, IResult>? validationHandler = null)
+        {
+            try
             {
-                Console.Error.WriteLine($"An error occurred: {ex.Message}");
-                return Results.Problem($"An error occurred while deleting the {typeof(T).Name}.");
+                return await action();
+            }
+            catch (ValidationException validationEx) when (validationHandler != null)
+            {
+                return validationHandler(validationEx);
+            }
+            catch (Exception)
+            {
+                return Results.Problem(errorMessage);
             }
         }
+
+        private static IResult HandleValidationException(ValidationException validationEx)
+        {
+            var errors = validationEx.Errors.Select(e => new
+            {
+                Property = e.PropertyName,
+                Message = e.ErrorMessage
+            });
+
+            return Results.BadRequest(new
+            {
+                message = "Validation failed",
+                errors
+            });
+        }
+
         protected virtual Task OnBeforeCreate(ClaimsPrincipal user, TDto originalDto, IServiceProvider serviceProvider)
         {
             return Task.CompletedTask;

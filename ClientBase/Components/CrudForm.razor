@@ -11,7 +11,7 @@
 @inject IDialogService DialogService
 @inject IValidator<T> Validator
 @inject ICrudService<T> LookupService
-@inject ILocalBackupService LocalBackupService
+@inject IAuthHelperService AuthHelperService
 @inject ISnackbar Snackbar
 @typeparam T where T : class, IDto, IAuditDto, IAutoCrud
 
@@ -66,18 +66,12 @@
                             </MudButton>
                         }
                     </MudStack>
-                    <MudText Typo="Typo.caption" Style="italic">Last saved: @lastSaveDisplay | Last local backup:
-                        @lastBackupDisplay (<MudLink Typo="Typo.caption" OnClick="@OpenBackupDialog">review backups</MudLink>)
-                    </MudText>
                 }
                 
             </MudContainer>
         </CascadingValue>
     </CascadingValue>
 </CascadingValue>
-
-<!-- Backup History Dialog Component -->
-<BackupHistoryDialog T="T" @bind-IsVisible="showBackupDialog" Model="Model" OnBackupRestored="OnBackupRestored" />
 
 @code {
     public string Title => typeof(T).Name.Replace("Dto", string.Empty);
@@ -96,12 +90,6 @@
     [Parameter] public EventCallback<T> OnBeforeSave { get; set; }
     [Parameter] public EventCallback<T> OnAfterSave { get; set; }
     [Parameter] public bool CanFinalise { get; set; } = false;
-    private System.Timers.Timer? _backupTimer;
-    private string lastSaveDisplay = "Never saved";
-    private string lastBackupDisplay = "Loading...";
-
-    // Backup dialog field
-    private bool showBackupDialog = false;
 
     private Func<object, string, Task<IEnumerable<string>>> GetValidationFunction()
     {
@@ -119,21 +107,6 @@
 
             return await ((IValidateValue)Validator).ValidateValue(model, propertyName, validationModes);
         };
-    }
-
-
-    protected override async Task OnInitializedAsync()
-    {
-        // Initialize the backup service
-        await LocalBackupService.InitializeAsync();
-
-        // Load the last backup time
-        await UpdateLastBackupDisplay();
-
-        // Set up auto-backup timer
-        _backupTimer = new System.Timers.Timer(30000);
-        _backupTimer.Elapsed += OnBackupTimerElapsed;
-        _backupTimer.Start();
     }
 
     protected override void OnParametersSet()
@@ -154,44 +127,10 @@
         }
     }
 
-    private async Task UpdateLastBackupDisplay()
-    {
-        try
-        {
-            var backupKey = $"{typeof(T).Name}_{Model.Id}";
-            var lastBackupTime = await LocalBackupService.GetLastBackupTime(backupKey);
-            lastBackupDisplay = lastBackupTime.ToLocalDisplayString(emptyText: "Never backed up");
-            lastSaveDisplay = Model.ModifiedDate.ToLocalDisplayString(emptyText: "Never saved");
-            StateHasChanged();
-        }
-        catch (Exception)
-        {
-            lastBackupDisplay = "Error loading backup info";
-        }
-    }
-
-    private void OnBackupTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
-    {
-        // Fire and forget the backup operation
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                var backupKey = $"{typeof(T).Name}_{Model.Id}";
-                await LocalBackupService.BackupSilentAsync(backupKey, Model);
-
-                // Update the display after successful backup
-                await InvokeAsync(async () => await UpdateLastBackupDisplay());
-            }
-            catch (Exception)
-            {
-
-            }
-        });
-    }
-
     private async Task SaveItem(bool submit = false)
-    {    
+    {
+        await EnsureModelContextAsync();
+
         ValidationResult fullValidation;
         if (submit && Model is IDraftable draftable)
         {
@@ -260,13 +199,6 @@
                     await OnAdd.InvokeAsync(Model);
                     await OnAfterSave.InvokeAsync(Model);
                 }
-
-                var refreshedModel = await LookupService.GetItemById(Model.Id, CancellationToken.None);
-                if (refreshedModel != null)
-                {
-                    Model = refreshedModel;
-                    lastSaveDisplay = DateTime.UtcNow.ToLocalDisplayString(emptyText: "Never saved");
-                }
             }
             catch
             {
@@ -298,19 +230,49 @@
         }
     }
 
+    private async Task EnsureModelContextAsync()
+    {
+        if (Model == null)
+        {
+            return;
+        }
+
+        if (Model.TenantId == Guid.Empty)
+        {
+            if (Tenant != null && Tenant.Id != Guid.Empty)
+            {
+                Model.TenantId = Tenant.Id;
+            }
+            else
+            {
+                var tenantId = await AuthHelperService.GetTenantIdAsync();
+                if (tenantId.HasValue)
+                {
+                    Model.TenantId = tenantId.Value;
+                }
+            }
+        }
+
+        if (Model.SubjectId == Guid.Empty)
+        {
+            if (Subject != null && Subject.Id != Guid.Empty)
+            {
+                Model.SubjectId = Subject.Id;
+            }
+            else
+            {
+                var subjectId = await AuthHelperService.GetSubjectIdAsync();
+                if (subjectId.HasValue)
+                {
+                    Model.SubjectId = subjectId.Value;
+                }
+            }
+        }
+    }
+
     private async Task DeleteItem()
     {
         await LookupService.DeleteItem(Model.Id, CancellationToken.None);
         await OnDelete.InvokeAsync(Model);
-    }
-
-    private void OpenBackupDialog()
-    {
-        showBackupDialog = true;
-    }
-
-    private void OnBackupRestored(T restoredModel)
-    {
-        StateHasChanged();
     }
 }

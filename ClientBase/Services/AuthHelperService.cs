@@ -50,7 +50,15 @@ namespace Boxty.ClientBase.Services
         public async Task<string?> GetFullNameAsync()
         {
             var user = await GetUserAsync();
-            return user?.FindFirst("name")?.Value;
+            if (user == null)
+            {
+                return null;
+            }
+
+            var firstName = user.FindFirst("given_name")?.Value ?? string.Empty;
+            var lastName = user.FindFirst("family_name")?.Value ?? string.Empty;
+            var fullName = $"{firstName} {lastName}".Trim();
+            return string.IsNullOrWhiteSpace(fullName) ? user.FindFirst("name")?.Value : fullName;
         }
 
         public async Task<string?> GetEmailAsync()
@@ -154,7 +162,9 @@ namespace Boxty.ClientBase.Services
             var user = await GetUserAsync();
             if (user == null) return false;
 
-            return user.IsInRole("administrator") || user.IsInRole("tenantadministrator");
+            var roles = GetRoles(user);
+            return roles.Contains("administrator", StringComparer.OrdinalIgnoreCase)
+                || roles.Contains("tenantadministrator", StringComparer.OrdinalIgnoreCase);
         }
 
         public async Task<bool> IsUserInRole(string role)
@@ -162,7 +172,7 @@ namespace Boxty.ClientBase.Services
             var user = await GetUserAsync();
             if (user == null) return false;
 
-            return user.IsInRole(role);
+            return GetRoles(user).Contains(role, StringComparer.OrdinalIgnoreCase);
         }
 
         public async Task<Guid?> GetSubjectIdAsync()
@@ -177,49 +187,165 @@ namespace Boxty.ClientBase.Services
         public async Task<Guid?> GetTenantIdAsync()
         {
             var user = await GetUserAsync();
-            if (user == null) return null;
-
-            var orgClaim = user.FindFirst("organization")?.Value;
-            if (string.IsNullOrEmpty(orgClaim))
+            if (user == null)
+            {
                 return null;
+            }
 
-            try
+            var claimTenantId = GetOrganizations(user).FirstOrDefault()?.Id.ToString();
+            if (Guid.TryParse(claimTenantId, out var tenantId))
             {
-                using var doc = JsonDocument.Parse(orgClaim);
-                var root = doc.RootElement;
-                // Handle array format (existing logic)
-                if (root.ValueKind == JsonValueKind.Array && root.GetArrayLength() > 0)
-                {
-                    var firstObj = root[0];
-                    if (firstObj.TryGetProperty("id", out var directIdProp))
-                    {
-                        var tenantIdClaimParsed = Guid.TryParse(directIdProp.GetString(), out var tenantId);
-                        return tenantIdClaimParsed ? tenantId : null;
-                    }
-                }
-                // Handle object format (new logic for nested structure)
-                if (root.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var property in root.EnumerateObject())
-                    {
-                        if (property.Value.ValueKind == JsonValueKind.Object &&
-                            property.Value.TryGetProperty("id", out var nestedIdProp))
-                        {
-                            var tenantIdClaimParsed = Guid.TryParse(nestedIdProp.GetString(), out var tenantId);
-                            return tenantIdClaimParsed ? tenantId : null;
-                        }
-                    }
-                }
+                return tenantId;
             }
-            catch
-            {
-            }
+
             return null;
         }
 
         public async Task<IEnumerable<RoleDto>> GetAllRolesAsync()
         {
             return await _httpClient.GetFromJsonAsync<List<RoleDto>>("api/auth/roles/getall") ?? new();
+        }
+
+        private static List<string> GetRoles(ClaimsPrincipal user)
+        {
+            var roles = new HashSet<string>(user.FindAll("role").Select(claim => claim.Value), StringComparer.OrdinalIgnoreCase);
+
+            AddRolesFromClaim(user, roles, "realm_access", root =>
+                root.TryGetProperty("roles", out var realmRoles) && realmRoles.ValueKind == JsonValueKind.Array
+                    ? realmRoles.EnumerateArray().Select(role => role.GetString())
+                    : Enumerable.Empty<string?>());
+
+            AddRolesFromClaim(user, roles, "resource_access", root =>
+                root.ValueKind != JsonValueKind.Object
+                    ? Enumerable.Empty<string?>()
+                    : root.EnumerateObject()
+                        .Where(resource => resource.Value.TryGetProperty("roles", out var resourceRoles) && resourceRoles.ValueKind == JsonValueKind.Array)
+                        .SelectMany(resource => resource.Value.GetProperty("roles").EnumerateArray().Select(role => role.GetString())));
+
+            return roles.ToList();
+        }
+
+        private static IReadOnlyList<OrganizationInfo> GetOrganizations(ClaimsPrincipal user)
+        {
+            var organizations = new List<OrganizationInfo>();
+            var organizationClaim = user.FindFirst("organization")?.Value;
+
+            if (string.IsNullOrWhiteSpace(organizationClaim))
+            {
+                return organizations;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(organizationClaim);
+                var root = document.RootElement;
+
+                if (root.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in root.EnumerateArray())
+                    {
+                        AddOrganization(organizations, item);
+                    }
+                }
+                else if (root.ValueKind == JsonValueKind.Object)
+                {
+                    if (root.TryGetProperty("id", out _))
+                    {
+                        AddOrganization(organizations, root);
+                    }
+                    else
+                    {
+                        foreach (var property in root.EnumerateObject())
+                        {
+                            if (property.Value.ValueKind == JsonValueKind.Object)
+                            {
+                                AddOrganization(organizations, property.Value, property.Name);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                return [];
+            }
+
+            return organizations
+                .Where(organization => organization.Id != Guid.Empty)
+                .GroupBy(organization => organization.Id)
+                .Select(group => group.First())
+                .ToList();
+        }
+
+        private static void AddRolesFromClaim(
+            ClaimsPrincipal user,
+            ISet<string> roles,
+            string claimType,
+            Func<JsonElement, IEnumerable<string?>> extractor)
+        {
+            var claimValue = user.FindFirst(claimType)?.Value;
+            if (string.IsNullOrWhiteSpace(claimValue))
+            {
+                return;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(claimValue);
+                foreach (var role in extractor(document.RootElement))
+                {
+                    if (!string.IsNullOrWhiteSpace(role))
+                    {
+                        roles.Add(role);
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+            }
+        }
+
+        private static void AddOrganization(List<OrganizationInfo> organizations, JsonElement element, string? fallbackName = null)
+        {
+            if (!element.TryGetProperty("id", out var idProperty))
+            {
+                return;
+            }
+
+            var idValue = idProperty.GetString();
+            if (!Guid.TryParse(idValue, out var organizationId))
+            {
+                return;
+            }
+
+            var name = GetStringProperty(element, "name")
+                ?? GetStringProperty(element, "displayName")
+                ?? GetStringProperty(element, "tenantName")
+                ?? GetStringProperty(element, "label")
+                ?? fallbackName
+                ?? organizationId.ToString();
+
+            organizations.Add(new OrganizationInfo
+            {
+                Id = organizationId,
+                Name = name
+            });
+        }
+
+        private static string? GetStringProperty(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
+            {
+                return null;
+            }
+
+            return property.GetString();
+        }
+
+        private sealed class OrganizationInfo
+        {
+            public Guid Id { get; init; }
+            public string Name { get; init; } = string.Empty;
         }
     }
 }

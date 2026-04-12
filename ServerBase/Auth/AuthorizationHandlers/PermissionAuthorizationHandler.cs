@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using Boxty.ServerBase.Auth.Requirements;
 using Boxty.ServerBase.Services;
+using Boxty.SharedBase.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 
 namespace Boxty.ServerBase.Auth.AuthorizationHandlers
@@ -12,14 +13,14 @@ namespace Boxty.ServerBase.Auth.AuthorizationHandlers
     public class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>
     {
         private readonly IRolePermissionCacheService _rolePermissionCacheService;
-        private readonly IUserContextService _userContextService;
+        private readonly IUserClaimsReader _userClaimsReader;
 
         public PermissionAuthorizationHandler(
             IRolePermissionCacheService rolePermissionCacheService,
-            IUserContextService userContextService)
+            IUserClaimsReader userClaimsReader)
         {
             _rolePermissionCacheService = rolePermissionCacheService ?? throw new ArgumentNullException(nameof(rolePermissionCacheService));
-            _userContextService = userContextService ?? throw new ArgumentNullException(nameof(userContextService));
+            _userClaimsReader = userClaimsReader ?? throw new ArgumentNullException(nameof(userClaimsReader));
         }
 
         protected override Task HandleRequirementAsync(
@@ -27,7 +28,7 @@ namespace Boxty.ServerBase.Auth.AuthorizationHandlers
             PermissionRequirement requirement)
         {
             // Get user roles from the context
-            var userRoles = _userContextService.GetRoles(context.User);
+            var userRoles = _userClaimsReader.GetRoles(context.User);
 
             if (userRoles == null || !userRoles.Any())
             {

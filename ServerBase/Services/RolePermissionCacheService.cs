@@ -1,17 +1,20 @@
 ﻿using System.Collections.Concurrent;
 using Boxty.ServerBase.Queries.ModuleQueries;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Boxty.ServerBase.Services
 {
     public class RolePermissionCacheService : IRolePermissionCacheService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly ILogger<RolePermissionCacheService> _logger;
         private readonly ConcurrentDictionary<string, HashSet<string>> _rolePermissionCache = new(StringComparer.OrdinalIgnoreCase);
 
-        public RolePermissionCacheService(IServiceProvider serviceProvider)
+        public RolePermissionCacheService(IServiceProvider serviceProvider, ILogger<RolePermissionCacheService> logger)
         {
             _serviceProvider = serviceProvider;
+            _logger = logger;
         }
 
         public async Task InitAsync()
@@ -24,7 +27,7 @@ namespace Boxty.ServerBase.Services
 
                 var roles = await getAllRolesQuery.Handle();
 
-                Console.WriteLine($"Loaded {roles.Count()} roles from Auth service");
+                _logger.LogInformation("Loaded {RoleCount} roles from permission provider", roles.Count());
 
                 _rolePermissionCache.Clear();
 
@@ -37,14 +40,14 @@ namespace Boxty.ServerBase.Services
             catch (Exception ex)
             {
                 // Log error but don't throw to prevent application startup issues
-                Console.Error.WriteLine($"Failed to initialize role permission cache: {ex.Message}");
+                _logger.LogWarning(ex, "Failed to initialize role permission cache");
             }
         }
 
         public bool HasPermission(string permissionName, string roleName)
         {
             return _rolePermissionCache.TryGetValue(roleName, out var permissions) &&
-                   permissions.Contains(permissionName);
+                   (permissions.Contains("*") || permissions.Contains(permissionName));
         }
     }
 }

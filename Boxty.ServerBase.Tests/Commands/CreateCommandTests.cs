@@ -93,10 +93,10 @@ namespace Boxty.ServerBase.Tests.Commands
             _mockValidator.Setup(v => v.ValidateAsync(dto, default))
                 .ReturnsAsync(validationResult);
             
-            _mockMapper.Setup(m => m.Map(dto))
+            _mockMapper.Setup(m => m.Map(dto, null))
                 .Returns(newEntity);
             
-            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, default))
+            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, CancellationToken.None))
                 .ReturnsAsync(1);
 
             // Act
@@ -105,7 +105,7 @@ namespace Boxty.ServerBase.Tests.Commands
             // Assert
             result.Should().Be(newEntity.Id);
             _mockDbSet.Verify(db => db.Add(newEntity), Times.Once);
-            _mockDbContext.Verify(db => db.SaveChangesWithAuditAsync(_user, default), Times.Once);
+            _mockDbContext.Verify(db => db.SaveChangesWithAuditAsync(_user, CancellationToken.None), Times.Once);
         }
 
         [Fact]
@@ -118,7 +118,7 @@ namespace Boxty.ServerBase.Tests.Commands
             _mockValidator.Setup(v => v.ValidateAsync(dto, default))
                 .ReturnsAsync(validationResult);
             
-            _mockMapper.Setup(m => m.Map(dto))
+            _mockMapper.Setup(m => m.Map(dto, null))
                 .Returns(new TestEntity { Id = Guid.NewGuid() });
 
             // Act
@@ -143,14 +143,14 @@ namespace Boxty.ServerBase.Tests.Commands
             _mockValidator.Setup(v => v.ValidateAsync(dto, default))
                 .ReturnsAsync(validationResult);
             
-            _mockMapper.Setup(m => m.Map(dto))
+            _mockMapper.Setup(m => m.Map(dto, null))
                 .Returns(entity);
 
             // Act
             await _command.Handle(dto, _user, skipAuth: true);
 
             // Assert
-            _mockMapper.Verify(m => m.Map(dto), Times.Once);
+            _mockMapper.Verify(m => m.Map(dto, null), Times.Once);
         }
 
         [Fact]
@@ -165,10 +165,10 @@ namespace Boxty.ServerBase.Tests.Commands
             _mockValidator.Setup(v => v.ValidateAsync(dto, default))
                 .ReturnsAsync(validationResult);
             
-            _mockMapper.Setup(m => m.Map(dto))
+            _mockMapper.Setup(m => m.Map(dto, null))
                 .Returns(entity);
             
-            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, default))
+            _mockDbContext.Setup(db => db.SaveChangesWithAuditAsync(_user, CancellationToken.None))
                 .ReturnsAsync(1);
 
             // Act
@@ -188,7 +188,7 @@ namespace Boxty.ServerBase.Tests.Commands
             _mockValidator.Setup(v => v.ValidateAsync(dto, default))
                 .ReturnsAsync(validationResult);
             
-            _mockMapper.Setup(m => m.Map(dto))
+            _mockMapper.Setup(m => m.Map(dto, null))
                 .Returns(new TestEntity { Id = Guid.NewGuid() });
 
             // Act

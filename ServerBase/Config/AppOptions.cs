@@ -11,6 +11,19 @@
         public required AuthModuleOptions AuthModule { get; set; }
         public required string[] Modules { get; set; }
         public required EmailOptions Email { get; set; }
+        public IdentityOptions Identity { get; set; } = new();
+        public PermissionCacheOptions PermissionCache { get; set; } = new();
+    }
+
+    public class IdentityOptions
+    {
+        public string Mode { get; set; } = "KeycloakOnly";
+    }
+
+    public class PermissionCacheOptions
+    {
+        public bool EnableAutoRefresh { get; set; } = true;
+        public int AutoRefreshIntervalSeconds { get; set; } = 300;
     }
 
     public class ConnectionStringsOptions

@@ -76,6 +76,35 @@ app.ConfigureServicesAndMapEndpoints(builder.Environment.IsDevelopment() || buil
 ...
 ```
 
+### Keycloak-Only Identity Mode
+
+`Boxty.ServerBase` supports Keycloak-only identity by default:
+
+```json
+"Identity": {
+    "Mode": "KeycloakOnly"
+}
+```
+
+In this mode, tenant/subject lifecycle is managed via Keycloak APIs and local auth/usermanagement schema writes are skipped.
+
+### Fine-Grained Permissions via Keycloak Roles
+
+Boxty enforces operation/entity permissions in the format `{Operation}{Entity}` such as:
+- `CreateBike`
+- `ViewBike`
+- `UpdateBike`
+- `DeleteBike`
+- `FinaliseBike`
+
+For Keycloak-only mode, attach a role attribute named `permissions` in Keycloak and list allowed permissions:
+
+```text
+permissions = CreateBike,ViewBike,UpdateBike,DeleteBike
+```
+
+`administrator` is treated as wildcard `*` by default in permission cache checks.
+
 ### Client Setup
 
 ```csharp
@@ -87,8 +116,8 @@ builder.Services.AddScoped<ICrudService<SubjectDocumentDto>, CrudService<Subject
 builder.Services.AddScoped<ICrudService<TenantNoteDto>, CrudService<TenantNoteDto>>();
 builder.Services.AddScoped<ICrudService<SubjectNoteDto>, CrudService<SubjectNoteDto>>();
 builder.Services.AddScoped<IDocumentUploadService, DocumentUploadService>();
+builder.Services.AddScoped<IUserClaimsReader, UserClaimsReader>();
 builder.Services.AddScoped<IAuthHelperService, AuthHelperService>();
-builder.Services.AddScoped<ILocalBackupService, LocalBackupService>();
 builder.Services.AddScoped<GlobalStateService>();
 builder.Services.AddScoped<IServerEventStreamClient, ServerEventStreamClient>();
 ```
