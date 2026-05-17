@@ -45,8 +45,10 @@ namespace Boxty.ServerBase.Extensions
             }
 
             services.AddScoped<IAuthorizationHandler, ResourceAccessAuthorizationHandler>();
+            services.AddScoped<IAuthorizationHandler, CreateEntityAuthorizationHandler>();
             services.AddScoped<IAuthorizationHandler, PermissionAuthorizationHandler>();
             ResourceAccessPolicyRegistry.AddRequirement(new ResourceAccessRequirement());
+            CreateEntityPolicyRegistry.AddRequirement(new CreateEntityRequirement());
 
             TryRegisterSharedValidators(services);
 
@@ -54,6 +56,7 @@ namespace Boxty.ServerBase.Extensions
             {
                 options.AddPermissionPoliciesForEntities();
                 ResourceAccessPolicyRegistry.BuildPolicy(options);
+                CreateEntityPolicyRegistry.BuildPolicy(options);
             });
 
             return services;

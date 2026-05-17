@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -22,7 +23,12 @@ namespace Boxty.ServerBase.Modules
         {
             services.Configure<AppOptions>(configuration);
 
-            services.AddDatabaseDeveloperPageExceptionFilter();
+            var environmentName = configuration["ASPNETCORE_ENVIRONMENT"] ?? configuration["DOTNET_ENVIRONMENT"];
+            if (string.Equals(environmentName, Environments.Development, StringComparison.OrdinalIgnoreCase))
+            {
+                services.AddDatabaseDeveloperPageExceptionFilter();
+            }
+
             services.AddCors(options =>
             {
                 options.AddPolicy("Client",
@@ -108,17 +114,6 @@ namespace Boxty.ServerBase.Modules
             app.UseAuthentication();
             app.UseAuthorization();
             logger.LogDebug("Authentication and authorization configured");
-
-            app.MapPost("/api/admin/permissions/refresh", async (IRolePermissionCacheService cacheService) =>
-            {
-                await cacheService.InitAsync();
-                return Results.Ok(new
-                {
-                    message = "Permission cache refreshed",
-                    refreshedAtUtc = DateTime.UtcNow
-                });
-            })
-            .RequireAuthorization(policy => policy.RequireRole("administrator"));
 
             if (isDevelopment)
             {
