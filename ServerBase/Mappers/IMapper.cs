@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using System.Collections.Generic;
 
 namespace Boxty.ServerBase.Mappers
 {
@@ -6,8 +7,6 @@ namespace Boxty.ServerBase.Mappers
     {
         TDto Map(T entity, ClaimsPrincipal? user = null);
         T Map(TDto dto, ClaimsPrincipal? user = null);
-        IEnumerable<TDto> Map(IEnumerable<T> entities, ClaimsPrincipal? user = null);
-        IEnumerable<T> Map(IEnumerable<TDto> dtos, ClaimsPrincipal? user = null);
         void Map(TDto dto, T entity, ClaimsPrincipal? user = null);
         void Map(T entity, TDto dto, ClaimsPrincipal? user = null);
     }

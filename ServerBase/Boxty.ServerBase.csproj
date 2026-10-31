@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<PackageId>Boxty.ServerBase</PackageId>
-		<Version>1.0.5</Version>
+		<Version>1.0.6</Version>
     <Authors>Mike Samy</Authors>
     <Company>Boxty.org</Company>
     <PackageTags>Boxty;ServerBase;ASP.NET Core;Multi-tenant;Keycloak</PackageTags>
@@ -37,6 +37,7 @@
 		</PackageReference>
 		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.3" />
 		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
+		<PackageReference Include="Riok.Mapperly" Version="4.3.1" />
 		<PackageReference Include="Scalar.AspNetCore" Version="2.1.1" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.3" />
 		<PackageReference Include="Schick.Keycloak.RestApiClient" Version="26.2.0" />
