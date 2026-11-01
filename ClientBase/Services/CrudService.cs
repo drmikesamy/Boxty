@@ -6,8 +6,6 @@ using Boxty.SharedBase.DTOs;
 using Boxty.SharedBase.Interfaces;
 using Boxty.SharedBase.Models;
 using MudBlazor;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.WebAssembly.Authentication;
 
 namespace Boxty.ClientBase.Services
 {
@@ -38,22 +36,12 @@ where TDto : IDto, IAutoCrud
         private readonly ISnackbar _snackbar;
         private readonly IDialogService _dialogService;
         private readonly GlobalStateService _globalStateService;
-        private readonly NavigationManager _navigationManager;
-        public CrudService(IHttpClientFactory httpClientFactory, ISnackbar snackbar, IDialogService dialogService, GlobalStateService globalStateService, NavigationManager navigationManager)
+        public CrudService(IHttpClientFactory httpClientFactory, ISnackbar snackbar, IDialogService dialogService, GlobalStateService globalStateService)
         {
             _httpClient = httpClientFactory.CreateClient("api");
             _snackbar = snackbar;
             _dialogService = dialogService;
             _globalStateService = globalStateService;
-            _navigationManager = navigationManager;
-        }
-
-        private void CheckAndHandleUnauthorized(System.Net.HttpStatusCode statusCode)
-        {
-            if (statusCode == System.Net.HttpStatusCode.Unauthorized)
-            {
-                _navigationManager.NavigateToLogout("authentication/logout");
-            }
         }
 
         public string ItemToString(Guid e) => e != Guid.Empty && _itemList.TryGetValue(e, out var item) ? $"{item.Item1.DisplayName}" : string.Empty;
@@ -102,12 +90,6 @@ where TDto : IDto, IAutoCrud
                 var response = await _httpClient.GetAsync(sb.ToString(), token);
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return Enumerable.Empty<Guid>();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return Enumerable.Empty<Guid>();
-                }
 
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<IEnumerable<TDto>>(cancellationToken: token);
@@ -181,12 +163,6 @@ where TDto : IDto, IAutoCrud
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return default;
 
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return default;
-                }
-
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<TDto>(cancellationToken: token);
                 if (result != null)
@@ -254,12 +230,6 @@ where TDto : IDto, IAutoCrud
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return Enumerable.Empty<TDto>();
 
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return Enumerable.Empty<TDto>();
-                }
-
                 if (response.IsSuccessStatusCode)
                 {
                     var items = await response.Content.ReadFromJsonAsync<IEnumerable<TDto>>(token);
@@ -326,12 +296,6 @@ where TDto : IDto, IAutoCrud
                 var response = await _httpClient.GetAsync(sb.ToString(), token);
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return Enumerable.Empty<TDto>();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return Enumerable.Empty<TDto>();
-                }
 
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<IEnumerable<TDto>>(cancellationToken: token);
@@ -416,12 +380,6 @@ where TDto : IDto, IAutoCrud
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return new PagedResult<TDto> { Items = Enumerable.Empty<TDto>(), TotalCount = 0 };
 
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return new PagedResult<TDto> { Items = Enumerable.Empty<TDto>(), TotalCount = 0 };
-                }
-
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<PagedResult<TDto>>(cancellationToken: token);
                 if (result?.Items != null)
@@ -456,11 +414,6 @@ where TDto : IDto, IAutoCrud
                         _itemList[createdItemId] = new Tuple<TDto, DateTime>(item, DateTime.UtcNow);
                     }
                     _snackbar.Add($"Successfully added {EndpointType}", Severity.Success);
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    throw new HttpRequestException("Unauthorized");
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
@@ -515,11 +468,6 @@ where TDto : IDto, IAutoCrud
                         _itemList[updatedItemId] = new Tuple<TDto, DateTime>(item, DateTime.UtcNow);
                     }
                     _snackbar.Add($"Successfully updated {EndpointType}", Severity.Success);
-                }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    throw new HttpRequestException("Unauthorized");
                 }
                 else if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
                 {
@@ -577,11 +525,6 @@ where TDto : IDto, IAutoCrud
                     _itemList.Remove(id);
                     _snackbar.Add($"Successfully deleted {EndpointType}", Severity.Success);
                 }
-                else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    throw new HttpRequestException("Unauthorized");
-                }
                 else
                 {
                     _snackbar.Add($"Failed to delete {EndpointType}: {response.StatusCode}", Severity.Error);
@@ -626,12 +569,6 @@ where TDto : IDto, IAutoCrud
                 var response = await _httpClient.GetAsync($"api/{EndpointType}/getall?tenantId={tenantId}", token);
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return Enumerable.Empty<TDto>();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return Enumerable.Empty<TDto>();
-                }
 
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<IEnumerable<TDto>>(cancellationToken: token);
@@ -682,12 +619,6 @@ where TDto : IDto, IAutoCrud
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return Enumerable.Empty<TDto>();
 
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return Enumerable.Empty<TDto>();
-                }
-
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<IEnumerable<TDto>>(cancellationToken: token);
                 if (result != null)
@@ -736,12 +667,6 @@ where TDto : IDto, IAutoCrud
                 var response = await _httpClient.GetAsync(customRoute, token);
                 if (response.StatusCode == System.Net.HttpStatusCode.NoContent)
                     return Enumerable.Empty<TDto>();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
-                {
-                    CheckAndHandleUnauthorized(response.StatusCode);
-                    return Enumerable.Empty<TDto>();
-                }
 
                 response.EnsureSuccessStatusCode();
                 var result = await response.Content.ReadFromJsonAsync<IEnumerable<TDto>>(cancellationToken: token);
@@ -800,4 +725,3 @@ where TDto : IDto, IAutoCrud
     }
 
 }
-
