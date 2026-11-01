@@ -17,7 +17,7 @@ This guide explains how to develop and debug the Boxty NuGet packages with your 
    </configuration>
    ```
    
-   ⚠️ **Important**: Update the path to match where your Boxty folder is located.
+   **Important**: Update the path to match where your Boxty folder is located.
 
 2. **Reference the packages** in your demo project's `.csproj`:
    ```xml
@@ -221,5 +221,3 @@ Since you have Boxty in one VS Code window and demo in another:
 2. **In demo window**: Run `dotnet restore && dotnet build && dotnet run`
 3. Set breakpoints in both windows
 4. Start debugging from demo window - it will step into Boxty code
-
-VS Code will handle cross-window debugging automatically! 🎉

@@ -122,33 +122,6 @@ builder.Services.AddScoped<GlobalStateService>();
 builder.Services.AddScoped<IServerEventStreamClient, ServerEventStreamClient>();
 ```
 
-### Realtime Streaming Pattern (Reusable)
-
-Boxty provides reusable primitives for module-level realtime updates without introducing custom auth flows:
-
-- `Boxty.ServerBase.Interfaces.IKeyedEventStream<TKey,TEvent>`
-- `Boxty.ServerBase.Services.InMemoryKeyedEventStream<TKey,TEvent>`
-- `Boxty.ClientBase.Services.IServerEventStreamClient`
-- `Boxty.ClientBase.Services.ServerEventStreamClient`
-
-Server registration example:
-
-```csharp
-services.AddSingleton<IKeyedEventStream<Guid, MyEventDto>, InMemoryKeyedEventStream<Guid, MyEventDto>>();
-```
-
-Client consumption example:
-
-```csharp
-await serverEventStreamClient.StreamAsync<MyEventDto>("api/mymodule/events/stream", async evt =>
-{
-    // Update component state from streamed event
-    await InvokeAsync(StateHasChanged);
-}, cancellationToken);
-```
-
-This pattern works with standard Keycloak/JWT auth because requests flow through the normal authenticated `HttpClient` pipeline.
-
 ## Requirements
 
 - .NET 8.0 or higher
